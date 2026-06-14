@@ -36,46 +36,76 @@ mkdir -p "$STEERING_DIR" "$HOOKS_DIR"
 cat > "$STEERING_DIR/okf-knowledge.md" << 'STEERING'
 ---
 inclusion: auto
-description: Integrates okf-tools knowledge retrieval into agent workflows
+description: Comprehensive guide for AI agents on using okf-tools to manage knowledge
 ---
 
-# OKF Knowledge Integration
+# OKF Knowledge Tools
 
-You have access to an OKF knowledge bundle via the `okf` CLI. Use it to persist and retrieve learnings across interactions.
+You have access to `okf` — a CLI for managing an OKF knowledge bundle in this workspace. The bundle stores learnings, patterns, decisions, and context as linked markdown files with semantic search.
 
-## When to Fetch
+## When to Use okf-tools
 
-- At the start of each interaction, run `okf fetch "<brief description of task>"` to check for relevant prior knowledge.
-- Before architectural decisions, check for existing rationale.
-- When encountering unfamiliar patterns, search first.
+**USE when:**
+- The task involves this codebase or project-specific knowledge (patterns, decisions, architecture, bugs)
+- You need context about past decisions or established patterns before making changes
+- You've learned something worth preserving for future sessions
+- You're doing bulk operations on concept files and need to verify integrity
 
-## When to Commit
+**DO NOT USE when:**
+- The user is asking a general programming question unrelated to this project
+- The task is purely about external documentation or libraries
+- The user explicitly says not to
 
-- After discovering a significant bug fix, pattern, or decision.
-- Always check for duplicates first: `okf commit --check-duplicates --json '{...}'`
+## Available Commands
 
-## When to Navigate
+### Search & Retrieve
 
-- Use `okf links <concept-id>` to explore related concepts.
-- Use `okf list --type "Pattern"` to browse available patterns.
-- Use `okf show <concept-id>` to read a full concept before acting on it.
+| Command | When to Use |
+|---------|-------------|
+| `okf fetch "<query>"` | Before starting work that might have prior context. Searches semantically — describe what you're looking for in natural language. |
+| `okf show <concept-id>` | After fetch returns relevant results. Loads the full concept body into your context. |
+| `okf list [--type X] [--tags Y]` | When browsing what's available. Use `--format brief` to scan without loading full content. |
+| `okf links <concept-id> [--depth N]` | When exploring related concepts. Shows what links to/from a concept. |
 
-## When to Lint
+### Author & Modify
 
-- After bulk operations (multiple commits, imports, or restructuring), run `okf lint`.
-- Treat lint errors as blockers — fix them before considering the task complete.
+| Command | When to Use |
+|---------|-------------|
+| `okf commit --check-duplicates --json '{...}'` | After discovering a significant pattern, decision, or bug fix worth persisting. Always use `--check-duplicates`. |
+| `okf update <concept-id> --json '{...}'` | When existing knowledge needs correction or expansion. |
+| `okf delete <concept-id>` | When a concept is obsolete or incorrect. Rarely needed. |
 
-## Command Quick Reference
+### Validate & Maintain
 
-```
-okf fetch "query"               # Semantic search
-okf commit --json '{...}'       # Create concept
-okf show <concept-id>           # Read full concept
-okf links <concept-id>          # See connections
-okf list [--type X] [--tags Y]  # Browse
-okf lint                        # Validate compliance
-okf stats                       # Bundle health
-```
+| Command | When to Use |
+|---------|-------------|
+| `okf lint` | After bulk operations (multiple commits, restructuring). Treat errors as blockers. |
+| `okf lint --path <dir>` | After modifying concepts in a specific directory. |
+| `okf reindex` | After external changes to .md files (manual edits, git pulls). Usually unnecessary — commit/update handle indexing automatically. |
+| `okf stats` | When you need to understand bundle health or structure. |
+
+### Discovery
+
+| Command | When to Use |
+|---------|-------------|
+| `okf skills` | To see what domain-specific guidance is available. |
+
+## Workflow Pattern
+
+1. **Before acting:** `okf fetch "<what I'm about to do>"` — check for existing knowledge
+2. **During work:** Use what you find to inform decisions
+3. **After learning:** `okf commit --check-duplicates --json '{"title": "...", "type": "...", "content": "...", "tags": [...]}'`
+4. **After bulk changes:** `okf lint` — verify compliance
+
+## Output Formats
+
+- Commands output JSON when piped (default for agents) — parse it directly
+- Use `okf --format json <command>` to force JSON output
+- Use `okf --format brief list` for compact scanning (concept_id\ttitle per line)
+
+## Concept Types to Use
+
+Use consistent type values. Common types: `Pattern`, `Decision`, `Bug Fix`, `API Endpoint`, `Architecture`, `Runbook`. Check existing types with `okf stats` before inventing new ones.
 STEERING
 
 echo "  ✓ Installed steering: $STEERING_DIR/okf-knowledge.md"
@@ -84,15 +114,15 @@ echo "  ✓ Installed steering: $STEERING_DIR/okf-knowledge.md"
 
 cat > "$HOOKS_DIR/okf-prompt-fetch.json" << 'HOOK'
 {
-  "name": "OKF Knowledge Fetch",
+  "name": "OKF Knowledge Awareness",
   "version": "1.0.0",
-  "description": "After each prompt, reminds the agent to check the OKF knowledge bundle for relevant context",
+  "description": "Points the agent to the okf-knowledge steering file after each prompt so it knows the knowledge tools are available",
   "when": {
     "type": "promptSubmit"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Before proceeding, check if there is relevant prior knowledge in the OKF bundle. Run `okf fetch \"<one-line summary of the user's request>\"` and review any results with score > 0.3. If relevant concepts exist, use `okf show <concept-id>` to load them. Then proceed with the task informed by that context."
+    "prompt": "You have access to okf-tools for managing project knowledge. Refer to the okf-knowledge.md steering file for full command reference and usage guidance. If this task relates to the codebase or project-specific knowledge, consider running `okf fetch` with a relevant query before proceeding."
   }
 }
 HOOK
@@ -124,8 +154,8 @@ echo ""
 echo "Done. Installed okf-tools agent support to: $TARGET"
 echo ""
 echo "Files installed:"
-echo "  $STEERING_DIR/okf-knowledge.md     — steering for knowledge retrieval"
-echo "  $HOOKS_DIR/okf-prompt-fetch.json   — fetch knowledge on each prompt"
+echo "  $STEERING_DIR/okf-knowledge.md     — full command reference and usage guidance"
+echo "  $HOOKS_DIR/okf-prompt-fetch.json   — points agent to steering on each prompt"
 echo "  $HOOKS_DIR/okf-post-task-lint.json — lint bundle after task completion"
 echo ""
 echo "Make sure 'okf' is on PATH (pip install okf-tools) and the target"
