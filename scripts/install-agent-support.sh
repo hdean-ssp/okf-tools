@@ -1,29 +1,76 @@
 #!/usr/bin/env bash
 # install-agent-support.sh
 #
-# Installs okf-tools steering files and hooks into a target workspace
-# (or the user's global ~/.kiro directory if no workspace is specified).
+# Installs okf-tools (into a persistent venv with PATH export) plus
+# steering files and hooks for agentic work.
 #
 # Usage:
 #   ./scripts/install-agent-support.sh                  # Install to ~/.kiro (user-level)
 #   ./scripts/install-agent-support.sh /path/to/project # Install to project/.kiro
 #
 # What gets installed:
-#   - Steering file: okf-knowledge.md (instructs agents to use okf-tools)
-#   - Hook: okf-prompt-fetch.json (runs okf fetch after each prompt)
+#   1. okf-tools venv at ~/.local/share/okf-tools/.venv (if not already present)
+#   2. PATH entry in ~/.bashrc so `okf` is available in all shells
+#   3. Steering file: okf-knowledge.md (full agent guide)
+#   4. Hook: okf-prompt-fetch.json (points agent to steering on each prompt)
+#   5. Hook: okf-post-task-lint.json (lints after task completion)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Determine target directory
+OKF_INSTALL_DIR="$HOME/.local/share/okf-tools"
+OKF_VENV="$OKF_INSTALL_DIR/.venv"
+OKF_BIN="$OKF_VENV/bin"
+
+# --- Step 1: Install okf-tools into a persistent venv ---
+
+if [[ -x "$OKF_BIN/okf" ]]; then
+    echo "✓ okf-tools already installed at $OKF_BIN/okf"
+else
+    echo "Installing okf-tools to $OKF_INSTALL_DIR..."
+    mkdir -p "$OKF_INSTALL_DIR"
+    python3 -m venv "$OKF_VENV"
+    "$OKF_BIN/pip" install --quiet --upgrade pip
+    "$OKF_BIN/pip" install --quiet "$REPO_ROOT"
+    echo "  ✓ Installed okf-tools to $OKF_BIN/okf"
+fi
+
+# --- Step 2: Ensure PATH includes the venv bin ---
+
+PATH_LINE="export PATH=\"$OKF_BIN:\$PATH\""
+BASHRC="$HOME/.bashrc"
+
+if grep -qF "$OKF_BIN" "$BASHRC" 2>/dev/null; then
+    echo "✓ PATH already configured in $BASHRC"
+else
+    echo "" >> "$BASHRC"
+    echo "# okf-tools CLI" >> "$BASHRC"
+    echo "$PATH_LINE" >> "$BASHRC"
+    echo "  ✓ Added $OKF_BIN to PATH in $BASHRC"
+fi
+
+# Make available in current session too
+export PATH="$OKF_BIN:$PATH"
+
+# Verify
+if command -v okf &>/dev/null; then
+    echo "  ✓ 'okf' command available ($(okf --version))"
+else
+    echo "  ⚠ 'okf' not found in current PATH — start a new shell or run: source ~/.bashrc"
+fi
+
+# --- Step 3: Determine steering/hooks target directory ---
+
 if [[ $# -ge 1 ]]; then
     TARGET="$(realpath "$1")/.kiro"
-    echo "Installing to workspace: $1"
+    echo ""
+    echo "Installing steering + hooks to workspace: $1"
 else
     TARGET="$HOME/.kiro"
-    echo "Installing to user directory: $TARGET"
+    echo ""
+    echo "Installing steering + hooks to user directory: $TARGET"
 fi
 
 STEERING_DIR="$TARGET/steering"
@@ -151,12 +198,14 @@ echo "  ✓ Installed hook: $HOOKS_DIR/okf-post-task-lint.json"
 # --- Summary ---
 
 echo ""
-echo "Done. Installed okf-tools agent support to: $TARGET"
+echo "Done. okf-tools agent support fully installed."
 echo ""
-echo "Files installed:"
+echo "CLI:"
+echo "  $OKF_BIN/okf (also on PATH via ~/.bashrc)"
+echo ""
+echo "Steering + Hooks:"
 echo "  $STEERING_DIR/okf-knowledge.md     — full command reference and usage guidance"
 echo "  $HOOKS_DIR/okf-prompt-fetch.json   — points agent to steering on each prompt"
 echo "  $HOOKS_DIR/okf-post-task-lint.json — lint bundle after task completion"
 echo ""
-echo "Make sure 'okf' is on PATH (pip install okf-tools) and the target"
-echo "workspace has an initialised bundle (okf init)."
+echo "Next: run 'okf init' in your project to initialise a knowledge bundle."

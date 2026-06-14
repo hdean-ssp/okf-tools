@@ -7,14 +7,13 @@ A companion CLI and library for working with [OKF](https://github.com/GoogleClou
 ## Quick Start
 
 ```bash
-# Clone and install into a venv
+# Clone and install (one-time setup)
 git clone https://github.com/hdean-ssp/okf-tools.git
 cd okf-tools
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
+./scripts/install-agent-support.sh ~/my-project
+source ~/.bashrc
 
-# Initialise a bundle in your project
+# Now 'okf' is available globally — initialise a bundle
 cd ~/my-project
 okf init
 
@@ -33,17 +32,25 @@ okf fetch "how to handle network failures"
 okf lint
 ```
 
-> **Note:** On Debian/Ubuntu systems that block system-wide pip installs, use a virtual environment as shown above. Alternatively, install with `pipx install .` for a global `okf` command without polluting system packages.
+The install script:
+1. Creates a persistent venv at `~/.local/share/okf-tools/.venv`
+2. Installs okf-tools into it
+3. Adds the venv's `bin/` to your PATH in `~/.bashrc` (so `okf` works in every new shell, including agent sessions)
+4. Installs steering files and hooks to the target workspace (or `~/.kiro` if no path given)
+
+> **Manual install alternative:** If you prefer to manage your own venv: `python3 -m venv .venv && source .venv/bin/activate && pip install -e .`
 
 ## Agent Integration (Steering + Hooks)
 
-To set up agent support in a workspace (installs steering files and hooks for Kiro):
+The install script handles everything — it installs the CLI globally and sets up agent support in one command:
 
 ```bash
-# Install to a specific project workspace
 ./scripts/install-agent-support.sh /path/to/your/project
+```
 
-# Or install to your user-level ~/.kiro (applies to all workspaces)
+Or for user-level (applies to all workspaces):
+
+```bash
 ./scripts/install-agent-support.sh
 ```
 
@@ -51,6 +58,8 @@ This installs:
 - **`steering/okf-knowledge.md`** — comprehensive guide for agents: when to use/not use, all commands, workflow patterns
 - **`hooks/okf-prompt-fetch.json`** — points agents to the steering file on each prompt
 - **`hooks/okf-post-task-lint.json`** — lints the bundle after task completion
+
+The `okf` command is on PATH permanently (via `~/.bashrc`), so agents can call it in any fresh shell session without activating a venv.
 
 ## What You Get
 
