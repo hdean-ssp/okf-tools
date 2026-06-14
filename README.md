@@ -7,14 +7,24 @@ A companion CLI and library for working with [OKF](https://github.com/GoogleClou
 ## Quick Start
 
 ```bash
-pip install okf-tools
+# Clone and install into a venv
+git clone https://github.com/hdean-ssp/okf-tools.git
+cd okf-tools
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
 
-# Initialise a bundle
-cd my-knowledge-repo
+# Initialise a bundle in your project
+cd ~/my-project
 okf init
 
 # Create a concept
-okf commit --title "Retry Pattern" --type "Pattern" --content "Use exponential backoff for transient failures." --tags "reliability,networking"
+okf commit --title "Retry Pattern" --type "Pattern" \
+  --content "Use exponential backoff for transient failures." \
+  --tags "reliability,networking"
+
+# Build the search index
+okf reindex
 
 # Search it
 okf fetch "how to handle network failures"
@@ -22,6 +32,25 @@ okf fetch "how to handle network failures"
 # Validate compliance
 okf lint
 ```
+
+> **Note:** On Debian/Ubuntu systems that block system-wide pip installs, use a virtual environment as shown above. Alternatively, install with `pipx install .` for a global `okf` command without polluting system packages.
+
+## Agent Integration (Steering + Hooks)
+
+To set up agent support in a workspace (installs steering files and hooks for Kiro):
+
+```bash
+# Install to a specific project workspace
+./scripts/install-agent-support.sh /path/to/your/project
+
+# Or install to your user-level ~/.kiro (applies to all workspaces)
+./scripts/install-agent-support.sh
+```
+
+This installs:
+- **`steering/okf-knowledge.md`** — comprehensive guide for agents: when to use/not use, all commands, workflow patterns
+- **`hooks/okf-prompt-fetch.json`** — points agents to the steering file on each prompt
+- **`hooks/okf-post-task-lint.json`** — lints the bundle after task completion
 
 ## What You Get
 
@@ -62,7 +91,7 @@ All commands support `--format json|text|brief`. Output is JSON when piped (agen
 ## Development
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/hdean-ssp/okf-tools.git
 cd okf-tools
 python3 -m venv .venv
 source .venv/bin/activate
