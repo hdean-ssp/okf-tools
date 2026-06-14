@@ -1,0 +1,79 @@
+# Architecture
+
+## Overview
+
+okf-tools is a layered Python application:
+
+```
+CLI (cli.py) → Service (service.py) → Domain Modules
+```
+
+The CLI is a thin Click shell. The service layer orchestrates workflows. Domain modules own their data and logic.
+
+## Components
+
+| Module | Responsibility |
+|--------|---------------|
+| `cli.py` | Click commands, output formatting, TTY detection |
+| `service.py` | Workflow orchestration (commit, fetch, lint, etc.) |
+| `bundle.py` | Parse/write OKF files, validate frontmatter, manage index.md |
+| `search.py` | Vector index (sqlite-vec), embeddings (fastembed) |
+| `graph.py` | Link parsing, adjacency storage, BFS traversal |
+| `sync.py` | Change detection, incremental/full reindexing |
+| `validation.py` | Bundle-wide compliance checks (lint) |
+| `config.py` | Configuration loading and merging |
+| `skills.py` | Skill pack discovery |
+| `errors.py` | Typed exception hierarchy |
+
+## Data Flow
+
+### Commit
+
+```
+Input → validate → generate slug → write .md → update index.md → embed → upsert vector → update graph → git add
+```
+
+### Fetch (Search)
+
+```
+Query → embed → cosine similarity search → filter by type/tags → return results
+```
+
+### Lint
+
+```
+Walk bundle → validate each concept's frontmatter → check structure (index.md) → check link integrity → check type consistency → report
+```
+
+### Reindex
+
+```
+Detect changes (mtime comparison) → parse changed files → batch embed → upsert vectors → rebuild links → persist timestamp
+```
+
+## Storage
+
+**Source of truth:** `.md` files on disk (git-tracked).
+
+**Derived sidecar:** `.okf/index/okf.db` — a SQLite database containing:
+- `concepts` table (metadata for filtering)
+- `vec_concepts` virtual table (384-dim embeddings via sqlite-vec)
+- `links` table (concept-to-concept edges)
+- `sync_meta` table (last sync timestamp)
+
+The sidecar is gitignored. Run `okf reindex --full` to rebuild from scratch.
+
+## Configuration Precedence
+
+1. Built-in defaults (always present)
+2. User config (`~/.config/okf/config.json`) overrides defaults
+3. Bundle config (`.okf/config.json`) overrides user config
+
+Merge is per-field — partial configs work fine.
+
+## Design Decisions
+
+1. **Files as data** — no database for concepts. Git provides versioning, blame, and collaboration.
+2. **Lazy model loading** — the embedding model only loads when a command needs it (fetch, commit, reindex). List, show, lint, stats never touch it.
+3. **Single SQLite file** — vector index + link graph share one database for simplicity.
+4. **Compliance as infrastructure** — lint isn't an afterthought; it's woven into reindex, steering files, and the default skill pack.

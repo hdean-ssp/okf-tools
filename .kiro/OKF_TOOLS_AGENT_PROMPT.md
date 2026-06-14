@@ -90,6 +90,16 @@ Key points:
    - Index freshness (last rebuild, concepts pending re-embed)
    - Bundle size on disk
 
+8. **Bundle Validation & Linting**
+   - Validate entire bundles for OKF compliance after the fact
+   - Structural checks: every directory with concepts has an index.md, no orphaned entries
+   - Link integrity: report broken internal markdown links proactively
+   - Type consistency: detect near-duplicate type values (case, hyphenation, whitespace variants)
+   - Configurable strictness: `strict` (requires title+description), `standard` (OKF minimum), `relaxed` (permissive)
+   - CI-friendly output: JSON diagnostics with file, rule, severity, message
+   - Integration with reindex via `--lint` flag
+   - Per-rule and per-path filtering for targeted validation
+
 ### Modular Skills System
 
 The tool must support **drop-in skill packs** — additional steering files and hooks that extend its behaviour for specific domains without modifying the core tool.
@@ -121,6 +131,7 @@ okf list                       # List concepts (filterable)
 okf show <concept-id>          # Display a concept's full content
 okf links <concept-id>         # Show link graph (inbound + outbound)
 okf reindex                    # Rebuild the vector index
+okf lint                       # Validate bundle for OKF compliance
 okf stats                      # Bundle statistics
 okf skills                     # List installed skill packs
 okf init                       # Initialise a new OKF bundle in cwd
@@ -138,7 +149,8 @@ okf commit --json '{...}' | --file path.json | --title "..." --content "..." --t
 okf commit --check-duplicates [--force]
 okf list [--type TYPE] [--tags tag1,tag2] [--since YYYY-MM-DD] [--limit N] [--path subdir/]
 okf links <concept-id> [--depth N] [--direction in|out|both]
-okf reindex [--full]
+okf reindex [--full] [--lint]
+okf lint [--warn-only] [--path subdir/] [--rule frontmatter|structure|links|types]
 ```
 
 ---
@@ -155,7 +167,8 @@ Config file: `.okf/config.json` in the bundle root, or `~/.config/okf/config.jso
   "default_top_n": 5,
   "similarity_threshold": 1.0,
   "auto_git_add": true,
-  "skills_paths": [".kiro/steering/", "~/.config/okf/skills/"]
+  "skills_paths": [".kiro/steering/", "~/.config/okf/skills/"],
+  "validation_level": "standard"
 }
 ```
 
@@ -187,6 +200,7 @@ okf-tools/
 │       ├── service.py          # Orchestration: commit, fetch, update, delete workflows
 │       ├── config.py           # Configuration loading and validation
 │       ├── sync.py             # Index synchronisation and incremental rebuild
+│       ├── validation.py      # Bundle-wide OKF compliance checking and linting
 │       ├── skills.py           # Skill pack discovery and listing
 │       └── errors.py           # Error hierarchy
 ├── skills/
@@ -264,6 +278,16 @@ pytest
 4. For deleted files: remove from index
 5. Persist last-sync timestamp
 
+### Lint workflow
+1. Walk the bundle, parse all concept files
+2. Run frontmatter validation on each concept (respecting validation_level)
+3. Check structural conventions (index.md presence, entry consistency)
+4. Check link integrity (all internal links resolve to existing files)
+5. Check type consistency (detect near-duplicate type values)
+6. Aggregate diagnostics with file, rule, severity, message
+7. Output results in the active format (JSON for CI, text for humans)
+8. Exit 0 if clean or --warn-only, exit 1 if errors found
+
 ---
 
 ## Documentation Requirements
@@ -308,6 +332,11 @@ You have access to an OKF knowledge bundle via the `okf` CLI. Use it to persist 
 - Use `okf list --type "Pattern"` to browse available patterns.
 - Use `okf show <concept-id>` to read a full concept before acting on it.
 
+## When to Lint
+- After bulk operations (multiple commits, imports, or restructuring), run `okf lint` to verify bundle integrity.
+- Before completing a task that modified the knowledge bundle, run `okf lint --path <affected-dir>` on changed directories.
+- Treat lint errors as blockers — fix them before considering the task complete.
+
 ## Command Quick Reference
 ```
 okf fetch "query"               # Semantic search
@@ -315,6 +344,7 @@ okf commit --json '{...}'       # Create concept
 okf show <concept-id>           # Read full concept
 okf links <concept-id>          # See connections
 okf list [--type X] [--tags Y]  # Browse
+okf lint                        # Validate compliance
 okf stats                       # Bundle health
 ```
 ```
@@ -380,10 +410,11 @@ Build in this sequence for a working tool at each step:
 6. **Show/list commands** — browse and display concepts
 7. **Graph module** — parse links, build adjacency, backlinks query
 8. **Links command** — expose graph traversal via CLI
-9. **Stats command** — bundle health metrics
-10. **Skills system** — discovery and listing of installed skill packs
-11. **Documentation** — README, getting-started, cli-reference, contributing
-12. **Tests** — unit tests for each module with a fixture bundle
+9. **Validation module** — lint command, structural checks, link integrity, type consistency
+10. **Stats command** — bundle health metrics
+11. **Skills system** — discovery and listing of installed skill packs
+12. **Documentation** — README, getting-started, cli-reference, contributing
+13. **Tests** — unit tests for each module with a fixture bundle
 
 ---
 
