@@ -85,28 +85,79 @@ def _handle_error(ctx: click.Context, message: str, exit_code: int = 1) -> None:
     default=None,
     help="Output format (default: text for TTY, json for pipes)",
 )
+@click.option(
+    "--bundle", "-b", "bundle_name",
+    default=None,
+    help="Target a specific bundle by name (for multi-bundle setups)",
+)
 @click.version_option(version=__version__)
 @click.pass_context
-def okf(ctx: click.Context, fmt: Optional[str]) -> None:
+def okf(ctx: click.Context, fmt: Optional[str], bundle_name: Optional[str]) -> None:
     """OKF bundle tools — search, author, and navigate knowledge."""
     ctx.ensure_object(dict)
     ctx.obj["format"] = _detect_format(fmt)
+    ctx.obj["bundle_name"] = bundle_name
 
 
 # --- Commands ---
 
 
 @okf.command()
+@click.option("--register", is_flag=True, help="Also register this bundle in ~/.config/okf/config.json")
+@click.option("--name", "bundle_name_opt", default=None, help="Name for the bundle (defaults to directory name)")
 @click.pass_context
-def init(ctx: click.Context) -> None:
+def init(ctx: click.Context, register: bool, bundle_name_opt: Optional[str]) -> None:
     """Initialise a new OKF bundle in the current directory."""
     from .service import init_bundle
 
     try:
-        init_bundle(Path.cwd())
+        path = Path.cwd()
+        init_bundle(path)
+
+        if register:
+            _register_bundle_in_user_config(path, bundle_name_opt)
+
         _output(ctx, {"status": "ok", "message": "Bundle initialised"})
     except OkfError as e:
         _handle_error(ctx, str(e))
+
+
+def _register_bundle_in_user_config(bundle_path: Path, name: Optional[str] = None) -> None:
+    """Add a bundle entry to the user-level config at ~/.config/okf/config.json."""
+    import json as _json
+
+    user_config_path = Path.home() / ".config" / "okf" / "config.json"
+    user_config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing or create new
+    if user_config_path.exists():
+        text = user_config_path.read_text(encoding="utf-8")
+        data = _json.loads(text)
+    else:
+        data = {}
+
+    # Ensure bundles array exists
+    if "bundles" not in data:
+        data["bundles"] = []
+
+    bundle_name = name or bundle_path.name
+    path_str = str(bundle_path)
+
+    # Check if already registered
+    for entry in data["bundles"]:
+        if entry.get("name") == bundle_name:
+            return  # Already registered, no-op
+
+    # Add the new bundle
+    new_entry = {"name": bundle_name, "path": path_str}
+    # If this is the first bundle, make it default
+    if not data["bundles"]:
+        new_entry["default"] = True
+    data["bundles"].append(new_entry)
+
+    user_config_path.write_text(
+        _json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 @okf.command()
@@ -141,8 +192,10 @@ def fetch(
     try:
         config = load_config()
         tags_list = [t.strip() for t in tags.split(",")] if tags else None
+        bundle_name = ctx.obj.get("bundle_name")
         results = fetch_concepts(
-            config, query, top_n, threshold, type_filter, tags_list, mode=mode
+            config, query, top_n, threshold, type_filter, tags_list,
+            mode=mode, bundle_name=bundle_name,
         )
         data = [
             {
@@ -150,6 +203,7 @@ def fetch(
                 "title": r.title,
                 "score": r.score,
                 "snippet": r.snippet,
+                **({"bundle": r.bundle} if r.bundle else {}),
             }
             for r in results
         ]
@@ -176,7 +230,8 @@ def commit(ctx: click.Context, **kwargs) -> None:
     try:
         config = load_config()
         input_data = _parse_commit_input(kwargs)
-        concept_id = commit_concept(config, input_data)
+        bundle_name = ctx.obj.get("bundle_name")
+        concept_id = commit_concept(config, input_data, bundle_name=bundle_name)
         _output(ctx, {"concept_id": concept_id})
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -198,7 +253,8 @@ def update(ctx: click.Context, concept_id: str, **kwargs) -> None:
     try:
         config = load_config()
         updates = _parse_update_input(kwargs)
-        result_id = update_concept(config, concept_id, updates)
+        bundle_name = ctx.obj.get("bundle_name")
+        result_id = update_concept(config, concept_id, updates, bundle_name=bundle_name)
         _output(ctx, {"concept_id": result_id})
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -213,7 +269,8 @@ def delete(ctx: click.Context, concept_id: str) -> None:
 
     try:
         config = load_config()
-        delete_concept(config, concept_id)
+        bundle_name = ctx.obj.get("bundle_name")
+        delete_concept(config, concept_id, bundle_name=bundle_name)
         _output(ctx, {"status": "ok", "concept_id": concept_id})
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -233,7 +290,11 @@ def list_cmd(ctx: click.Context, type_filter, tags, since, limit, path_filter) -
     try:
         config = load_config()
         tags_list = [t.strip() for t in tags.split(",")] if tags else None
-        concepts = list_concepts(config, type_filter, tags_list, since, limit, path_filter)
+        bundle_name = ctx.obj.get("bundle_name")
+        concepts = list_concepts(
+            config, type_filter, tags_list, since, limit, path_filter,
+            bundle_name=bundle_name,
+        )
         data = [
             {"concept_id": c.concept_id, "title": c.title, "type": c.type}
             for c in concepts

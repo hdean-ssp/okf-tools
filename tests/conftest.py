@@ -37,6 +37,14 @@ def tmp_bundle(tmp_path: Path) -> Path:
 @pytest.fixture
 def sample_config(tmp_bundle: Path) -> OkfConfig:
     """Return an OkfConfig pointing to the tmp_bundle."""
+    from okf_tools.config import BundleRef
+
+    bundle_ref = BundleRef(
+        name="test",
+        path=tmp_bundle,
+        writable=True,
+        default=True,
+    )
     return OkfConfig(
         bundle_path=tmp_bundle,
         index_path=Path(".okf/index"),
@@ -46,6 +54,7 @@ def sample_config(tmp_bundle: Path) -> OkfConfig:
         auto_git_add=False,
         skills_paths=[],
         validation_level="standard",
+        bundles=[bundle_ref],
     )
 
 

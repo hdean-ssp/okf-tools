@@ -81,6 +81,53 @@ Checks:
 - Link integrity (no broken internal links)
 - Type consistency (no near-duplicate type values)
 
+## Multi-Bundle Setup
+
+okf supports multiple named bundles — e.g. a personal bundle and a shared team bundle. This lets agents and developers accumulate knowledge collaboratively.
+
+### 1. Create your personal bundle
+
+```bash
+mkdir -p ~/personal/my-okf && cd ~/personal/my-okf
+git init
+okf init --register --name personal
+```
+
+The `--register` flag adds it to your user-level config at `~/.config/okf/config.json`.
+
+### 2. Add a shared team bundle
+
+Clone your team's knowledge repo and register it:
+
+```bash
+git clone git@github.com:your-org/team-knowledge.git /shared/team-okf
+cd /shared/team-okf
+okf init --register --name team
+```
+
+### 3. Set the default write target
+
+Edit `~/.config/okf/config.json`:
+
+```json
+{
+  "bundles": [
+    {"name": "personal", "path": "~/personal/my-okf"},
+    {"name": "team", "path": "/shared/team-okf", "default": true}
+  ]
+}
+```
+
+Now `okf commit` writes to the team bundle by default, and `okf fetch` searches both.
+
+### 4. Target a specific bundle
+
+```bash
+okf -b personal commit --json '{...}'   # Write to personal
+okf -b team fetch "query"               # Search only team
+okf fetch "query"                       # Searches all bundles
+```
+
 ## Next Steps
 
 - Run `okf list` to browse concepts

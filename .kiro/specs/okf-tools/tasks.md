@@ -81,9 +81,84 @@ Build the okf-tools CLI and library from scratch, implementing all 18 requiremen
 - Wave 9: Unit tests (depends on fixtures)
 - Wave 10: Documentation (depends on CLI being complete)
 
+- [x] 16. Add multi-bundle support to config module: Add `BundleRef` dataclass (name, path, writable=True, default=False), extend `OkfConfig` with a `bundles: List[BundleRef]` field, parse `"bundles"` array from user-level and project-level configs. `writable` defaults to `true` (all bundles writable unless explicitly locked). `default` marks which bundle receives writes when `--bundle` is not specified. Maintain backward compatibility — if old-style single `bundle_path` is present and no `bundles` array exists, synthesise a single-entry bundles list. Resolution order: project-level bundles (from `.okf/config.json` in cwd ancestors) then user-level bundles (from `~/.config/okf/config.json`). Each bundle has its own `.okf/index/okf.db` sidecar at `<bundle_path>/.okf/index/`.
+  Requirements: R12
+
+- [x] 17. Add `--bundle / -b` CLI option to the `okf` group: Pass bundle name through context. For write commands (commit, update, delete), target the named bundle (must be writable) or the default bundle if unspecified. For read commands (fetch, list, show, links, stats), default to all bundles unless `--bundle` narrows scope. Add `bundle` field to SearchResult output.
+  Requirements: R12, R7, R2, R3, R4
+
+- [x] 18. Implement aggregated search across multiple bundles: `fetch_concepts` in service.py iterates all configured bundles, queries each bundle's VectorIndex, merges results by score (descending), tags each result with its source bundle name. Deduplicate by concept_id (prefer highest score if same concept in multiple bundles). Respect `--bundle` flag to search a single bundle.
+  Requirements: R7
+
+- [x] 19. Implement write routing for multi-bundle: `commit_concept`, `update_concept`, and `delete_concept` in service.py route to the target bundle. If `--bundle` is specified, use that bundle. Otherwise use the bundle marked `"default": true`. If no default is set, use the first bundle in the list. If a bundle is explicitly marked `"writable": false`, raise a clear error. Since `writable` defaults to `true`, all bundles accept writes unless explicitly locked.
+  Requirements: R2, R3, R4
+
+- [x] 20. Update `init_bundle` for multi-bundle awareness: When `okf init` is run in a directory, it creates the standard `.okf/config.json` but also offers to register the new bundle in `~/.config/okf/config.json` bundles array (if the user-level config exists). Add `--register` flag to auto-add.
+  Requirements: R1
+
+- [x] 21. Update steering file for multi-bundle: Update the installed steering file (`~/.kiro/steering/okf-knowledge.md` or equivalent) to document `--bundle / -b` flag usage, explain personal vs shared bundle patterns, provide examples of user-level config with multiple bundles, and update the command reference table to show bundle-targeting syntax.
+  Requirements: Documentation
+
+- [x] 22. Update `skills/core-knowledge.md`: Add multi-bundle guidance for agents — when to use `--bundle`, how shared knowledge accumulates, how to check which bundles are configured, and default write-target behaviour.
+  Requirements: Documentation
+
+- [x] 23. Update `docs/getting-started.md`: Add a "Multi-Bundle Setup" section covering initial setup with personal + shared bundles, user-level config creation, and first commit to a shared bundle.
+  Requirements: Documentation
+
+- [x] 24. Update `docs/cli-reference.md`: Document the new `--bundle / -b` global option on the `okf` group, show examples for commit/fetch/list with explicit bundle targeting, and document `okf init --register`.
+  Requirements: Documentation
+
+- [x] 25. Update `docs/architecture.md`: Add a "Multi-Bundle Architecture" section explaining bundle resolution order, per-bundle sidecar indexes, aggregated search, write routing, and the config merging model.
+  Requirements: Documentation
+
+- [x] 26. Update `docs/for-agent-authors.md`: Add guidance on agentic multi-bundle workflows — how agents should default to the team bundle for shared knowledge, when to use personal bundles, and how `--bundle` integrates with steering prompts.
+  Requirements: Documentation
+
+- [x] 27. Update `README.md`: Add multi-bundle to the feature list, update the quick-start example to show multi-bundle config, and mention shared team bundles as a primary use case.
+  Requirements: Documentation
+
+- [x] 28. Update `.kiro/OKF_TOOLS_AGENT_PROMPT.md`: Sync the agent prompt with multi-bundle CLI changes so that agents using this tool understand the `--bundle` flag and default write behaviour.
+  Requirements: Documentation
+
+- [x] 29. Update `scripts/install-agent-support.sh`: Ensure the install script sets up a user-level config with a bundles array (prompting for personal bundle path) and installs the updated steering file that documents multi-bundle usage.
+  Requirements: Documentation
+
+- [x] 30. Add tests for multi-bundle: test_config.py — verify bundles array parsing, backward compat with single bundle_path, resolution order, writable defaults to true; test_service.py — verify aggregated search merges results from multiple bundles, write routing targets default bundle, explicit --bundle override works; test_cli.py — verify --bundle flag passes through correctly, init --register adds to user config.
+  Requirements: All
+
+## Task Dependency Graph (Multi-Bundle Feature)
+
+```json
+{
+  "waves": [
+    [16],
+    [17, 19],
+    [18, 20],
+    [21, 22, 23, 24, 25, 26, 27, 28, 29],
+    [30]
+  ]
+}
+```
+
+- Wave 1: Config changes (foundation for everything else)
+- Wave 2: CLI option + write routing (can be parallel — CLI just passes the flag, service routes writes)
+- Wave 3: Aggregated search + init update (depend on config + CLI option)
+- Wave 4: Documentation updates (all docs/steering/scripts can be done in parallel once implementation is settled)
+- Wave 5: Tests (depends on all implementation + docs being finalised)
+
 ## Notes
 
 - The fastembed model download (~30MB) happens on first use. CI should cache `~/.cache/fastembed/`.
 - sqlite-vec requires the `sqlite_vec` Python package which bundles the native extension — no system-level SQLite compilation needed.
 - All modules share the same `okf.db` SQLite file in `.okf/index/` — VectorIndex and LinkGraph connect to the same database path.
 - Python 3.9 compatibility: avoid `match` statements, use `dict` instead of `dict[str, Any]` in runtime code (use `from __future__ import annotations` or string annotations for type hints).
+- Multi-bundle: each bundle maintains its own sidecar index independently. All bundles are writable by default — `"writable": false` is an opt-in lock for reference bundles you don't want agents modifying. The shared team bundle is the ideal default write target for agentic use so knowledge is automatically shared. Shared bundles are synced between teammates via git (commit + push/pull).
+- Example user-level config (`~/.config/okf/config.json`):
+  ```json
+  {
+    "bundles": [
+      {"name": "personal", "path": "~/personal/my-okf"},
+      {"name": "team", "path": "/shared/team-okf", "default": true}
+    ]
+  }
+  ```

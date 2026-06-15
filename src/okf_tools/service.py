@@ -1,4 +1,8 @@
-"""Service layer: orchestrates multi-step workflows across modules."""
+"""Service layer: orchestrates multi-step workflows across modules.
+
+Supports multi-bundle operation — commit/update/delete route to a target
+bundle, while fetch/list aggregate across all configured bundles.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +23,7 @@ from .bundle import (
     walk_concepts,
     write_concept,
 )
-from .config import OkfConfig, get_defaults, load_config
+from .config import BundleRef, OkfConfig, get_defaults, load_config
 from .errors import (
     BundleAlreadyInitialisedError,
     ConceptNotFoundError,
@@ -68,8 +72,15 @@ def init_bundle(path: Path) -> None:
             gitignore.write_text(entry + "\n", encoding="utf-8")
 
 
-def commit_concept(config: OkfConfig, input_data: Dict[str, Any]) -> str:
-    """Full commit workflow. Returns concept_id."""
+def commit_concept(config: OkfConfig, input_data: Dict[str, Any], bundle_name: Optional[str] = None) -> str:
+    """Full commit workflow. Returns concept_id.
+
+    Routes the write to the specified bundle, or the default bundle.
+    """
+    # Resolve target bundle
+    bundle = config.get_writable_bundle(bundle_name)
+    bundle_path = bundle.path
+
     # Validate required fields
     missing = [f for f in ("title", "content", "type") if not input_data.get(f)]
     if missing:
@@ -92,18 +103,18 @@ def commit_concept(config: OkfConfig, input_data: Dict[str, Any]) -> str:
         raise ValidationError(errors)
 
     # Determine target directory
-    target_dir = config.bundle_path
+    target_dir = bundle_path
     if input_data.get("path"):
-        target_dir = config.bundle_path / input_data["path"]
+        target_dir = bundle_path / input_data["path"]
         target_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate slug and resolve unique path
     slug = generate_slug(input_data["title"])
     file_path = resolve_unique_path(target_dir, slug)
-    rel_path = file_path.relative_to(config.bundle_path)
+    rel_path = file_path.relative_to(bundle_path)
     concept_id = str(rel_path.with_suffix(""))
 
-    # Check duplicates if requested
+    # Check duplicates if requested (search across all bundles)
     if input_data.get("check_duplicates"):
         _check_duplicates(config, input_data["content"], input_data.get("force", False))
 
@@ -116,25 +127,36 @@ def commit_concept(config: OkfConfig, input_data: Dict[str, Any]) -> str:
     )
 
     # Write file
-    write_concept(concept, config.bundle_path)
+    write_concept(concept, bundle_path)
 
     # Update index.md
     update_index_file(file_path.parent, concept_id, input_data["title"])
 
     # Embed and index
-    _embed_and_index(config, concept)
+    _embed_and_index_for_bundle(config, bundle, concept)
 
     # Git add
     if config.auto_git_add:
-        _git_add(config.bundle_path, file_path)
+        _git_add(bundle_path, file_path)
 
     return concept_id
 
 
-def update_concept(config: OkfConfig, concept_id: str, updates: Dict[str, Any]) -> str:
-    """Full update workflow. Returns concept_id."""
-    file_path = _resolve_concept_path(config, concept_id)
-    concept = parse_concept(file_path, config.bundle_path)
+def update_concept(config: OkfConfig, concept_id: str, updates: Dict[str, Any], bundle_name: Optional[str] = None) -> str:
+    """Full update workflow. Returns concept_id.
+
+    Routes the update to the specified bundle, or searches all bundles
+    to find the concept.
+    """
+    bundle, file_path = _resolve_concept_in_bundles(config, concept_id, bundle_name)
+    bundle_path = bundle.path
+
+    # Verify writable
+    if not bundle.writable:
+        from .errors import ConfigError
+        raise ConfigError("bundles", f"Bundle '{bundle.name}' is read-only")
+
+    concept = parse_concept(file_path, bundle_path)
 
     # Merge updates
     old_title = concept.title
@@ -153,25 +175,34 @@ def update_concept(config: OkfConfig, concept_id: str, updates: Dict[str, Any]) 
         raise ValidationError(errors)
 
     # Write
-    write_concept(concept, config.bundle_path)
+    write_concept(concept, bundle_path)
 
     # Update index if title changed
     if concept.title != old_title and concept.title:
         update_index_file(file_path.parent, concept_id, concept.title)
 
     # Re-embed
-    _embed_and_index(config, concept)
+    _embed_and_index_for_bundle(config, bundle, concept)
 
     # Git add
     if config.auto_git_add:
-        _git_add(config.bundle_path, file_path)
+        _git_add(bundle_path, file_path)
 
     return concept_id
 
 
-def delete_concept(config: OkfConfig, concept_id: str) -> None:
-    """Full delete workflow."""
-    file_path = _resolve_concept_path(config, concept_id)
+def delete_concept(config: OkfConfig, concept_id: str, bundle_name: Optional[str] = None) -> None:
+    """Full delete workflow.
+
+    Finds the concept in the specified bundle (or searches all bundles).
+    """
+    bundle, file_path = _resolve_concept_in_bundles(config, concept_id, bundle_name)
+    bundle_path = bundle.path
+
+    # Verify writable
+    if not bundle.writable:
+        from .errors import ConfigError
+        raise ConfigError("bundles", f"Bundle '{bundle.name}' is read-only")
 
     # Remove file
     file_path.unlink()
@@ -180,7 +211,7 @@ def delete_concept(config: OkfConfig, concept_id: str) -> None:
     remove_from_index_file(file_path.parent, concept_id)
 
     # Remove from vector index and graph
-    index, graph = _open_index_and_graph(config)
+    index, graph = _open_index_and_graph_for_bundle(bundle)
     try:
         index.delete(concept_id)
         graph.remove_concept(concept_id)
@@ -190,7 +221,7 @@ def delete_concept(config: OkfConfig, concept_id: str) -> None:
 
     # Git add deletion
     if config.auto_git_add:
-        _git_add(config.bundle_path, file_path)
+        _git_add(bundle_path, file_path)
 
 
 def fetch_concepts(
@@ -201,30 +232,72 @@ def fetch_concepts(
     type_filter: Optional[str] = None,
     tags_filter: Optional[List[str]] = None,
     mode: str = "hybrid",
+    bundle_name: Optional[str] = None,
 ) -> List[SearchResult]:
-    """Semantic search workflow."""
-    index, _ = _open_index_and_graph(config)
-    try:
-        n = top_n or config.default_top_n
-        t = threshold if threshold is not None else 0.0
+    """Semantic search workflow — aggregates across all bundles.
 
-        if mode == "keyword":
-            results = index.search_keyword(query, n * 3)
-        else:
-            query_embedding = embed_text(query, config.embedding_model)
-            results = index.search(
-                query_embedding, n * 3, t, query=query, mode=mode
+    If bundle_name is specified, searches only that bundle.
+    Otherwise searches all configured bundles and merges results by score.
+    """
+    n = top_n or config.default_top_n
+    t = threshold if threshold is not None else 0.0
+
+    # Determine which bundles to search
+    if bundle_name:
+        bundle = config.get_bundle(bundle_name)
+        if bundle is None:
+            from .errors import ConfigError
+            raise ConfigError(
+                "bundles",
+                f"Bundle '{bundle_name}' not found. "
+                f"Available: {', '.join(b.name for b in config.bundles)}",
             )
-    finally:
-        index.close()
+        bundles_to_search = [bundle]
+    else:
+        bundles_to_search = config.bundles
 
-    # Apply metadata filters
+    # Collect results from all bundles
+    all_results: List[SearchResult] = []
+
+    for bundle in bundles_to_search:
+        if not bundle.index_db_path.exists():
+            continue
+
+        index = VectorIndex(bundle.index_db_path)
+        try:
+            if mode == "keyword":
+                results = index.search_keyword(query, n * 3)
+            else:
+                query_embedding = embed_text(query, config.embedding_model)
+                results = index.search(
+                    query_embedding, n * 3, t, query=query, mode=mode
+                )
+        finally:
+            index.close()
+
+        # Tag each result with its source bundle
+        for r in results:
+            r.bundle = bundle.name
+        all_results.extend(results)
+
+    # Apply metadata filters (check against each bundle's index)
     if type_filter:
-        results = [r for r in results if _matches_type(config, r.concept_id, type_filter)]
+        all_results = [r for r in all_results if _matches_type_in_bundle(config, r) and
+                       _result_type_matches(config, r, type_filter)]
     if tags_filter:
-        results = [r for r in results if _matches_tags(config, r.concept_id, tags_filter)]
+        all_results = [r for r in all_results if _matches_tags_in_bundle(config, r, tags_filter)]
 
-    return results[: (top_n or config.default_top_n)]
+    # Sort by score descending, deduplicate by concept_id (keep highest score)
+    all_results.sort(key=lambda r: r.score, reverse=True)
+    seen_ids: set = set()
+    deduplicated: List[SearchResult] = []
+    for r in all_results:
+        key = f"{r.bundle}:{r.concept_id}"
+        if key not in seen_ids:
+            seen_ids.add(key)
+            deduplicated.append(r)
+
+    return deduplicated[:n]
 
 
 def list_concepts(
@@ -234,41 +307,68 @@ def list_concepts(
     since: Optional[str] = None,
     limit: Optional[int] = None,
     path_filter: Optional[str] = None,
+    bundle_name: Optional[str] = None,
 ) -> List[Concept]:
-    """Filtered concept listing."""
-    concepts = walk_concepts(config.bundle_path)
+    """Filtered concept listing — aggregates across bundles.
 
-    if path_filter:
-        filter_path = (config.bundle_path / path_filter).resolve()
-        concepts = [c for c in concepts if c.file_path.is_relative_to(filter_path)]
+    If bundle_name is specified, lists only that bundle's concepts.
+    """
+    if bundle_name:
+        bundle = config.get_bundle(bundle_name)
+        if bundle is None:
+            from .errors import ConfigError
+            raise ConfigError(
+                "bundles",
+                f"Bundle '{bundle_name}' not found.",
+            )
+        bundles_to_list = [bundle]
+    else:
+        bundles_to_list = config.bundles
+
+    all_concepts: List[Concept] = []
+    for bundle in bundles_to_list:
+        if not bundle.path.exists():
+            continue
+        concepts = walk_concepts(bundle.path)
+
+        if path_filter:
+            filter_path = (bundle.path / path_filter).resolve()
+            concepts = [c for c in concepts if c.file_path.is_relative_to(filter_path)]
+
+        all_concepts.extend(concepts)
 
     if type_filter:
-        concepts = [c for c in concepts if c.frontmatter.get("type") == type_filter]
+        all_concepts = [c for c in all_concepts if c.frontmatter.get("type") == type_filter]
 
     if tags_filter:
-        concepts = [
-            c for c in concepts
+        all_concepts = [
+            c for c in all_concepts
             if set(c.tags) & set(tags_filter)
         ]
 
     if since:
-        concepts = [
-            c for c in concepts
+        all_concepts = [
+            c for c in all_concepts
             if c.timestamp and c.timestamp >= since
         ]
 
     # Sort by concept_id
-    concepts.sort(key=lambda c: c.concept_id)
+    all_concepts.sort(key=lambda c: c.concept_id)
 
     if limit:
-        concepts = concepts[:limit]
+        all_concepts = all_concepts[:limit]
 
-    return concepts
+    return all_concepts
 
 
 def show_concept(config: OkfConfig, concept_id: str) -> Concept:
-    """Load and return a single concept."""
-    file_path = _resolve_concept_path(config, concept_id)
+    """Load and return a single concept. Searches all bundles."""
+    _, file_path = _resolve_concept_in_bundles(config, concept_id)
+    # Determine which bundle this is in to get the correct bundle_path
+    for bundle in config.bundles:
+        if file_path.is_relative_to(bundle.path):
+            return parse_concept(file_path, bundle.path)
+    # Fallback to legacy
     return parse_concept(file_path, config.bundle_path)
 
 
@@ -276,9 +376,9 @@ def get_links(
     config: OkfConfig, concept_id: str, direction: str = "both", depth: int = 1
 ) -> Dict[str, List[str]]:
     """Graph traversal. Returns inbound/outbound concept_ids."""
-    _resolve_concept_path(config, concept_id)  # Verify exists
+    bundle, _ = _resolve_concept_in_bundles(config, concept_id)
 
-    _, graph = _open_index_and_graph(config)
+    _, graph = _open_index_and_graph_for_bundle(bundle)
     try:
         if depth > 1:
             neighbors = graph.bfs_neighborhood(concept_id, depth, direction)
@@ -391,24 +491,76 @@ def lint_bundle(
 
 
 def _resolve_concept_path(config: OkfConfig, concept_id: str) -> Path:
-    """Resolve concept_id to file path, raising ConceptNotFoundError if missing."""
+    """Resolve concept_id to file path in the default bundle.
+
+    Raises ConceptNotFoundError if missing. Legacy helper for backward compat.
+    """
     file_path = config.bundle_path / (concept_id + ".md")
     if not file_path.exists():
         raise ConceptNotFoundError(concept_id)
     return file_path
 
 
+def _resolve_concept_in_bundles(
+    config: OkfConfig, concept_id: str, bundle_name: Optional[str] = None
+) -> "tuple[BundleRef, Path]":
+    """Find a concept across bundles. Returns (bundle, file_path).
+
+    If bundle_name is specified, look only in that bundle.
+    Otherwise search all bundles in order.
+    """
+    if bundle_name:
+        bundle = config.get_bundle(bundle_name)
+        if bundle is None:
+            from .errors import ConfigError
+            raise ConfigError(
+                "bundles",
+                f"Bundle '{bundle_name}' not found.",
+            )
+        file_path = bundle.path / (concept_id + ".md")
+        if not file_path.exists():
+            raise ConceptNotFoundError(concept_id)
+        return bundle, file_path
+
+    # Search all bundles
+    for bundle in config.bundles:
+        file_path = bundle.path / (concept_id + ".md")
+        if file_path.exists():
+            return bundle, file_path
+
+    raise ConceptNotFoundError(concept_id)
+
+
 def _open_index_and_graph(config: OkfConfig):
-    """Open the sidecar database for both vector index and graph."""
+    """Open the sidecar database for the default bundle. Legacy helper."""
     db_path = config.bundle_path / config.index_path / "okf.db"
     index = VectorIndex(db_path)
     graph = LinkGraph(db_path)
     return index, graph
 
 
+def _open_index_and_graph_for_bundle(bundle: BundleRef):
+    """Open the sidecar database for a specific bundle."""
+    db_path = bundle.index_db_path
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    index = VectorIndex(db_path)
+    graph = LinkGraph(db_path)
+    return index, graph
+
+
 def _embed_and_index(config: OkfConfig, concept: Concept) -> None:
-    """Embed concept body and upsert into vector index + graph."""
-    index, graph = _open_index_and_graph(config)
+    """Embed concept body and upsert into the default bundle's index.
+
+    Legacy helper — delegates to _embed_and_index_for_bundle.
+    """
+    default_bundle = config.get_default_bundle()
+    if default_bundle:
+        _embed_and_index_for_bundle(config, default_bundle, concept)
+
+
+def _embed_and_index_for_bundle(config: OkfConfig, bundle: BundleRef, concept: Concept) -> None:
+    """Embed concept body and upsert into a specific bundle's index + graph."""
+    index, graph = _open_index_and_graph_for_bundle(bundle)
     try:
         embedding = embed_text(concept.body, config.embedding_model)
         metadata = {
@@ -420,7 +572,7 @@ def _embed_and_index(config: OkfConfig, concept: Concept) -> None:
             "body": concept.body,
         }
         index.upsert(concept.concept_id, embedding, metadata)
-        targets = extract_links(concept, config.bundle_path)
+        targets = extract_links(concept, bundle.path)
         graph.set_links(concept.concept_id, targets)
     finally:
         index.close()
@@ -428,21 +580,68 @@ def _embed_and_index(config: OkfConfig, concept: Concept) -> None:
 
 
 def _check_duplicates(config: OkfConfig, content: str, force: bool) -> None:
-    """Check for similar existing concepts. Raises ValidationError if found and not forced."""
-    index, _ = _open_index_and_graph(config)
+    """Check for similar existing concepts across all bundles.
+
+    Raises ValidationError if found and not forced.
+    """
+    embedding = embed_text(content, config.embedding_model)
+    all_dups: List[str] = []
+
+    for bundle in config.bundles:
+        if not bundle.index_db_path.exists():
+            continue
+        index = VectorIndex(bundle.index_db_path)
+        try:
+            results = index.search(embedding, 5, config.similarity_threshold)
+            for r in results:
+                all_dups.append(f"{bundle.name}:{r.concept_id} (score={r.score})")
+        finally:
+            index.close()
+
+    if all_dups and not force:
+        raise ValidationError([f"Similar concepts found: {'; '.join(all_dups)}"])
+
+
+def _result_type_matches(config: OkfConfig, result: SearchResult, type_filter: str) -> bool:
+    """Check if a search result's concept matches a type filter."""
+    if not result.bundle:
+        return False
+    bundle = config.get_bundle(result.bundle)
+    if not bundle:
+        return False
+    index = VectorIndex(bundle.index_db_path)
     try:
-        embedding = embed_text(content, config.embedding_model)
-        results = index.search(embedding, 5, config.similarity_threshold)
+        meta = index.get_metadata(result.concept_id)
+        return meta is not None and meta.get("type") == type_filter
     finally:
         index.close()
 
-    if results and not force:
-        dups = "; ".join(f"{r.concept_id} (score={r.score})" for r in results)
-        raise ValidationError([f"Similar concepts found: {dups}"])
+
+def _matches_type_in_bundle(config: OkfConfig, result: SearchResult) -> bool:
+    """Verify a result's bundle exists (used as pre-filter)."""
+    return result.bundle is not None and config.get_bundle(result.bundle) is not None
+
+
+def _matches_tags_in_bundle(config: OkfConfig, result: SearchResult, tags_filter: List[str]) -> bool:
+    """Check if a search result's concept matches tags filter."""
+    if not result.bundle:
+        return False
+    bundle = config.get_bundle(result.bundle)
+    if not bundle:
+        return False
+    index = VectorIndex(bundle.index_db_path)
+    try:
+        meta = index.get_metadata(result.concept_id)
+        if meta is None:
+            return False
+        concept_tags = meta.get("tags", [])
+        return bool(set(concept_tags) & set(tags_filter))
+    finally:
+        index.close()
 
 
 def _matches_type(config: OkfConfig, concept_id: str, type_filter: str) -> bool:
-    """Check if a concept matches a type filter."""
+    """Check if a concept matches a type filter. Legacy helper."""
     index, _ = _open_index_and_graph(config)
     try:
         meta = index.get_metadata(concept_id)
@@ -452,7 +651,7 @@ def _matches_type(config: OkfConfig, concept_id: str, type_filter: str) -> bool:
 
 
 def _matches_tags(config: OkfConfig, concept_id: str, tags_filter: List[str]) -> bool:
-    """Check if a concept matches a tags filter."""
+    """Check if a concept matches a tags filter. Legacy helper."""
     index, _ = _open_index_and_graph(config)
     try:
         meta = index.get_metadata(concept_id)

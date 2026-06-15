@@ -6,11 +6,13 @@ All commands use `okf` as the entry point. Global options go before the subcomma
 
 ```
 okf --format json|text|brief <command>
+okf --bundle <name> <command>     # or: okf -b <name> <command>
 okf --version
 okf --help
 ```
 
 - `--format`: Override output format. Default: `text` for TTY, `json` when piped.
+- `--bundle` / `-b`: Target a specific named bundle. Applies to all subcommands. For write commands (commit, update, delete) this sets the write target. For read commands (fetch, list, show, links, stats) this limits scope to one bundle. Without `-b`, reads search all bundles and writes go to the default bundle.
 
 ---
 
@@ -20,9 +22,17 @@ Initialise a new OKF bundle in the current directory.
 
 ```bash
 okf init
+okf init --register                    # Also add to ~/.config/okf/config.json
+okf init --register --name team-kb     # Register with a custom name
 ```
 
 Creates `.okf/config.json`, root `index.md`, and updates `.gitignore` if in a git repo.
+
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `--register` | Register the new bundle in user-level config |
+| `--name` | Name for the bundle (defaults to directory name) |
 
 ---
 
@@ -57,6 +67,13 @@ okf commit --json '...' --check-duplicates --force
 | `--path` | Target subdirectory |
 | `--check-duplicates` | Warn if similar concepts exist |
 | `--force` | Commit despite duplicates |
+
+**Multi-bundle:**
+```bash
+okf -b team commit --json '...'       # Write to team bundle
+okf -b personal commit --json '...'   # Write to personal bundle
+okf commit --json '...'               # Write to the default bundle
+```
 
 ---
 
@@ -137,6 +154,8 @@ okf fetch "resilience" --mode semantic  # Vector cosine only
 - **hybrid** — merges BM25 keyword scores (40%) with vector cosine similarity (60%). Best for most queries.
 - **semantic** — pure vector cosine similarity. Good for natural language queries where exact terms don't matter.
 - **keyword** — pure BM25 full-text search via SQLite FTS5. Good for exact term lookups. Does not load the embedding model.
+
+**Multi-bundle:** By default, searches all configured bundles and merges results by score. Each result includes a `bundle` field showing its source. Use `-b` to search a single bundle.
 
 ---
 

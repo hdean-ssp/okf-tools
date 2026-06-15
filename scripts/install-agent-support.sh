@@ -61,7 +61,25 @@ else
     echo "  ⚠ 'okf' not found in current PATH — start a new shell or run: source ~/.bashrc"
 fi
 
-# --- Step 3: Determine steering/hooks target directory ---
+# --- Step 3: Ensure user-level config exists ---
+
+USER_CONFIG_DIR="$HOME/.config/okf"
+USER_CONFIG="$USER_CONFIG_DIR/config.json"
+
+if [[ -f "$USER_CONFIG" ]]; then
+    echo "✓ User config already exists at $USER_CONFIG"
+else
+    mkdir -p "$USER_CONFIG_DIR"
+    cat > "$USER_CONFIG" << 'CONFIG'
+{
+  "bundles": []
+}
+CONFIG
+    echo "  ✓ Created user config at $USER_CONFIG"
+    echo "    Add bundles with: okf init --register --name <name>"
+fi
+
+# --- Step 4: Determine steering/hooks target directory ---
 
 if [[ $# -ge 1 ]]; then
     TARGET="$(realpath "$1")/.kiro"
@@ -88,12 +106,40 @@ description: Comprehensive guide for AI agents on using okf-tools to manage know
 
 # OKF Knowledge Tools
 
-You have access to `okf` — a CLI for managing an OKF knowledge bundle in this workspace. The bundle stores learnings, patterns, decisions, and context as linked markdown files with semantic search.
+You have access to `okf` — a CLI for managing OKF knowledge bundles. Bundles store learnings, patterns, decisions, and context as linked markdown files with semantic search.
+
+## Multi-Bundle Setup
+
+okf supports multiple named bundles. Common setup:
+- **personal** — your own learnings, per-user, private
+- **team** — shared knowledge across teammates, synced via git
+
+Configuration lives at `~/.config/okf/config.json`:
+```json
+{
+  "bundles": [
+    {"name": "personal", "path": "~/personal/my-okf"},
+    {"name": "team", "path": "/shared/team-okf", "default": true}
+  ]
+}
+```
+
+The `"default": true` bundle is the write target unless `--bundle` is specified.
+
+### Bundle Targeting
+
+Use `-b <name>` (before the subcommand) to target a specific bundle:
+```
+okf -b personal commit --json '{...}'    # Write to personal bundle
+okf -b team fetch "query"                # Search only team bundle
+okf fetch "query"                        # Searches ALL bundles (default)
+okf commit --json '{...}'                # Writes to the default bundle
+```
 
 ## When to Use okf-tools
 
 **USE when:**
-- The task involves this codebase or project-specific knowledge (patterns, decisions, architecture, bugs)
+- The task involves project-specific knowledge (patterns, decisions, architecture, bugs)
 - You need context about past decisions or established patterns before making changes
 - You've learned something worth preserving for future sessions
 - You're doing bulk operations on concept files and need to verify integrity
@@ -109,7 +155,7 @@ You have access to `okf` — a CLI for managing an OKF knowledge bundle in this 
 
 | Command | When to Use |
 |---------|-------------|
-| `okf fetch "<query>"` | Before starting work that might have prior context. Uses hybrid search (keyword + semantic) by default. Use `--mode keyword` for exact term lookups, `--mode semantic` for pure meaning-based search. |
+| `okf fetch "<query>"` | Before starting work that might have prior context. Uses hybrid search (keyword + semantic) by default. Searches all bundles unless `-b` is used. |
 | `okf show <concept-id>` | After fetch returns relevant results. Loads the full concept body into your context. |
 | `okf list [--type X] [--tags Y]` | When browsing what's available. Use `--format brief` to scan without loading full content. |
 | `okf links <concept-id> [--depth N]` | When exploring related concepts. Shows what links to/from a concept. |
@@ -118,7 +164,8 @@ You have access to `okf` — a CLI for managing an OKF knowledge bundle in this 
 
 | Command | When to Use |
 |---------|-------------|
-| `okf commit --check-duplicates --json '{...}'` | After discovering a significant pattern, decision, or bug fix worth persisting. Always use `--check-duplicates`. |
+| `okf commit --check-duplicates --json '{...}'` | After discovering a significant pattern, decision, or bug fix worth persisting. Always use `--check-duplicates`. Writes to default bundle. |
+| `okf -b <name> commit --json '{...}'` | Write to a specific bundle (e.g. personal vs team). |
 | `okf update <concept-id> --json '{...}'` | When existing knowledge needs correction or expansion. |
 | `okf delete <concept-id>` | When a concept is obsolete or incorrect. Rarely needed. |
 
@@ -149,6 +196,7 @@ You have access to `okf` — a CLI for managing an OKF knowledge bundle in this 
 - Commands output JSON when piped (default for agents) — parse it directly
 - Use `okf --format json <command>` to force JSON output
 - Use `okf --format brief list` for compact scanning (concept_id\ttitle per line)
+- Fetch results include a `bundle` field showing which bundle each result came from
 
 ## Concept Types to Use
 
@@ -203,9 +251,14 @@ echo ""
 echo "CLI:"
 echo "  $OKF_BIN/okf (also on PATH via ~/.bashrc)"
 echo ""
+echo "Config:"
+echo "  $USER_CONFIG — add bundles here or use 'okf init --register'"
+echo ""
 echo "Steering + Hooks:"
 echo "  $STEERING_DIR/okf-knowledge.md     — full command reference and usage guidance"
 echo "  $HOOKS_DIR/okf-prompt-fetch.json   — points agent to steering on each prompt"
 echo "  $HOOKS_DIR/okf-post-task-lint.json — lint bundle after task completion"
 echo ""
-echo "Next: run 'okf init' in your project to initialise a knowledge bundle."
+echo "Next steps:"
+echo "  1. Create a knowledge bundle: mkdir ~/my-knowledge && cd ~/my-knowledge && okf init --register --name personal"
+echo "  2. Or clone a shared team bundle and register it: okf init --register --name team"

@@ -21,6 +21,7 @@ class SearchResult:
     title: Optional[str]
     score: float
     snippet: str
+    bundle: Optional[str] = None
 
 
 # --- Embedding (lazy-loaded) ---

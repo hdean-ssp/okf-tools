@@ -117,3 +117,56 @@ Errors are written to stderr as JSON when format is json:
 ```
 
 Check exit codes: 0 = success, 1 = error, 2 = usage error.
+
+## Multi-Bundle Agentic Workflows
+
+When multiple bundles are configured (personal + team), agents should:
+
+### Default to the team bundle for shared knowledge
+
+Knowledge that benefits the team — bug fixes, patterns, architectural decisions — should go to the team/shared bundle. If the shared bundle is configured as `"default": true`, this happens automatically:
+
+```bash
+okf commit --check-duplicates --json '{...}'  # Goes to default (team) bundle
+```
+
+### Use personal bundle for scratch/private notes
+
+```bash
+okf -b personal commit --json '{
+  "title": "My Notes on X",
+  "type": "Note",
+  "content": "...",
+  "tags": ["personal"]
+}'
+```
+
+### Search results include source bundle
+
+When fetching, results include a `bundle` field:
+
+```json
+[
+  {"concept_id": "retry-pattern", "title": "...", "score": 0.87, "bundle": "team"},
+  {"concept_id": "my-notes", "title": "...", "score": 0.72, "bundle": "personal"}
+]
+```
+
+### Duplicate checking spans all bundles
+
+`--check-duplicates` searches across ALL configured bundles. If a teammate already committed a similar concept to the team bundle, the agent will be warned before duplicating it.
+
+### Steering file example for multi-bundle
+
+```markdown
+---
+inclusion: auto
+---
+
+# Knowledge Integration (Multi-Bundle)
+
+- Before each task: `okf fetch "<task summary>"` (searches all bundles)
+- After shared discoveries: `okf commit --check-duplicates --json '...'` (default = team)
+- After personal notes: `okf -b personal commit --json '...'`
+- After bulk changes: `okf lint`
+```

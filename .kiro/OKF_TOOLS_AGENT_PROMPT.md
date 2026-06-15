@@ -428,3 +428,35 @@ Build in this sequence for a working tool at each step:
   - genero-tools — structural codebase analysis for Genero/4GL
   - System documentation files — business logic docs stored as markdown
   - These integrations are NOT part of okf-tools itself — they're skill pack examples
+
+---
+
+## Multi-Bundle Architecture
+
+okf-tools supports multiple named bundles configured at `~/.config/okf/config.json`:
+
+```json
+{
+  "bundles": [
+    {"name": "personal", "path": "~/personal/my-okf"},
+    {"name": "team", "path": "/shared/team-okf", "default": true}
+  ]
+}
+```
+
+### Key behaviours:
+
+- **All bundles are writable by default.** `"writable": false` is an opt-in lock for reference bundles.
+- **`okf fetch` searches ALL bundles** and merges results by score. Each result has a `bundle` field.
+- **`okf commit` writes to the default bundle** unless `--bundle / -b` is specified.
+- **`okf -b <name>` targets a specific bundle** for any command (placed before the subcommand).
+- **`okf init --register --name <name>`** initialises a bundle and adds it to user config.
+- **Duplicate checking spans all bundles** — avoids redundant commits across personal/team.
+- **Each bundle has its own sidecar index** at `<bundle_path>/.okf/index/okf.db`.
+- **Shared bundles sync via git** — commit/push/pull like any repo. The index is gitignored.
+
+### Config resolution:
+
+1. Project-level bundles (from `.okf/config.json` in cwd ancestors) — highest priority
+2. User-level bundles (from `~/.config/okf/config.json`)
+3. Legacy single-bundle fallback (backward compat with old `bundle_path` field)

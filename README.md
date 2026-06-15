@@ -83,12 +83,34 @@ All commands support `--format json|text|brief`. Output is JSON when piped (agen
 ## Key Design Decisions
 
 - **Markdown files are the source of truth** — the vector index is a derived sidecar, gitignored and rebuildable
-- **Hybrid search** — combines BM25 keyword matching with vector semantic similarity (no external services)
+- **Multi-bundle architecture** — personal + shared team bundles. All writable, all searchable. Agents commit to the team bundle by default; knowledge accumulates collaboratively via git
+- **Hybrid search** — combines BM25 keyword matching with vector semantic similarity (no external services). Searches across all configured bundles
 - **Local embeddings** — fastembed + BAAI/bge-small-en-v1.5, no API keys needed
 - **Incremental indexing** — only re-embeds changed files
 - **Link graph** — parse markdown links between concepts for backlink/neighborhood queries
 - **Compliance-first** — `okf lint` validates structure, links, types, and frontmatter
 - **Extensible** — drop-in skill packs for domain-specific agent guidance
+
+## Multi-Bundle (Personal + Team)
+
+okf supports multiple named bundles. Typical setup:
+
+```json
+// ~/.config/okf/config.json
+{
+  "bundles": [
+    {"name": "personal", "path": "~/personal/my-okf"},
+    {"name": "team", "path": "/shared/team-okf", "default": true}
+  ]
+}
+```
+
+- `okf fetch` searches ALL bundles — results tagged with source
+- `okf commit` writes to the default bundle (team)
+- `okf -b personal commit ...` writes to personal
+- Shared bundles sync between teammates via git push/pull
+
+See [Getting Started](docs/getting-started.md#multi-bundle-setup) for full setup guide.
 
 ## Documentation
 
