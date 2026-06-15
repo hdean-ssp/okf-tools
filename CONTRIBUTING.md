@@ -35,7 +35,7 @@ src/okf_tools/
 ├── cli.py          # Click commands (thin — delegates to service)
 ├── service.py      # Workflow orchestration
 ├── bundle.py       # File parsing, writing, validation
-├── search.py       # Vector index (sqlite-vec + fastembed)
+├── search.py       # Hybrid search: vector (sqlite-vec) + BM25 (FTS5) + fastembed
 ├── graph.py        # Link graph (adjacency + BFS)
 ├── sync.py         # Incremental reindexing
 ├── validation.py   # Bundle-wide lint checks
@@ -43,6 +43,10 @@ src/okf_tools/
 ├── skills.py       # Skill pack discovery
 └── errors.py       # Error hierarchy
 ```
+
+## OKF Spec Reference
+
+The spec we target is vendored at `spec/OKF_SPEC_v0.1.md`. The version constant lives in `src/okf_tools/__init__.py` as `OKF_SPEC_VERSION`. When the upstream spec changes, update both.
 
 ## Pull Request Guidelines
 

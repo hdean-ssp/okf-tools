@@ -17,7 +17,7 @@ The CLI is a thin Click shell. The service layer orchestrates workflows. Domain 
 | `cli.py` | Click commands, output formatting, TTY detection |
 | `service.py` | Workflow orchestration (commit, fetch, lint, etc.) |
 | `bundle.py` | Parse/write OKF files, validate frontmatter, manage index.md |
-| `search.py` | Vector index (sqlite-vec), embeddings (fastembed) |
+| `search.py` | Hybrid search: vector index (sqlite-vec) + FTS5 keyword index, embeddings (fastembed) |
 | `graph.py` | Link parsing, adjacency storage, BFS traversal |
 | `sync.py` | Change detection, incremental/full reindexing |
 | `validation.py` | Bundle-wide compliance checks (lint) |
@@ -36,8 +36,10 @@ Input → validate → generate slug → write .md → update index.md → embed
 ### Fetch (Search)
 
 ```
-Query → embed → cosine similarity search → filter by type/tags → return results
+Query → [hybrid mode] → BM25 keyword search (FTS5) + embed query → vector cosine search → normalize scores → merge (60% semantic + 40% keyword) → filter by type/tags → return results
 ```
+
+Modes: `hybrid` (default), `semantic` (vector only), `keyword` (BM25 only).
 
 ### Lint
 
@@ -58,6 +60,7 @@ Detect changes (mtime comparison) → parse changed files → batch embed → up
 **Derived sidecar:** `.okf/index/okf.db` — a SQLite database containing:
 - `concepts` table (metadata for filtering)
 - `vec_concepts` virtual table (384-dim embeddings via sqlite-vec)
+- `fts_concepts` virtual table (FTS5 full-text index for BM25 keyword search)
 - `links` table (concept-to-concept edges)
 - `sync_meta` table (last sync timestamp)
 
@@ -74,6 +77,7 @@ Merge is per-field — partial configs work fine.
 ## Design Decisions
 
 1. **Files as data** — no database for concepts. Git provides versioning, blame, and collaboration.
-2. **Lazy model loading** — the embedding model only loads when a command needs it (fetch, commit, reindex). List, show, lint, stats never touch it.
-3. **Single SQLite file** — vector index + link graph share one database for simplicity.
-4. **Compliance as infrastructure** — lint isn't an afterthought; it's woven into reindex, steering files, and the default skill pack.
+2. **Hybrid search** — BM25 keyword matching catches exact terms; vector cosine catches semantic meaning. Combined by default (60/40 weighting), with pure modes available via `--mode`.
+3. **Lazy model loading** — the embedding model only loads when a command needs it (fetch in semantic/hybrid mode, commit, reindex). List, show, lint, stats, and keyword-only fetch never touch it.
+4. **Single SQLite file** — vector index + FTS index + link graph share one database for simplicity.
+5. **Compliance as infrastructure** — lint isn't an afterthought; it's woven into reindex, steering files, and the default skill pack.

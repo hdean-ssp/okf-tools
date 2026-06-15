@@ -114,12 +114,14 @@ okf --format json show patterns/retry-with-backoff   # structured JSON
 
 ## okf fetch \<query\>
 
-Semantic search over the bundle.
+Search the bundle using hybrid (keyword + semantic), pure semantic, or pure keyword mode.
 
 ```bash
 okf fetch "handling network failures"
 okf fetch "auth patterns" --top-n 10 --threshold 0.3
 okf fetch "database" --type "Pattern" --tags "performance"
+okf fetch "retry" --mode keyword       # BM25 full-text only
+okf fetch "resilience" --mode semantic  # Vector cosine only
 ```
 
 **Options:**
@@ -129,6 +131,12 @@ okf fetch "database" --type "Pattern" --tags "performance"
 | `--threshold` | Min similarity score (0.0–1.0) |
 | `--type` | Filter by type |
 | `--tags` | Filter by tags (comma-separated) |
+| `--mode` | `hybrid` (default), `semantic`, or `keyword` |
+
+**Search modes:**
+- **hybrid** — merges BM25 keyword scores (40%) with vector cosine similarity (60%). Best for most queries.
+- **semantic** — pure vector cosine similarity. Good for natural language queries where exact terms don't matter.
+- **keyword** — pure BM25 full-text search via SQLite FTS5. Good for exact term lookups. Does not load the embedding model.
 
 ---
 

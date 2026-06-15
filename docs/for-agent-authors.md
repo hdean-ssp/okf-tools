@@ -23,7 +23,7 @@ All JSON output is valid, parseable, and contains no decorative text.
 okf fetch "brief description of current task"
 ```
 
-If results are relevant, use `okf show <concept-id>` to load full context.
+Uses hybrid search by default (keyword + semantic). For exact term lookups use `--mode keyword`. If results are relevant, use `okf show <concept-id>` to load full context.
 
 ### 2. Commit after learning
 

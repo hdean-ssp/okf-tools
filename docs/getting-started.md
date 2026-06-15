@@ -3,8 +3,15 @@
 ## Installation
 
 ```bash
-pip install okf-tools
+git clone https://github.com/hdean-ssp/okf-tools.git
+cd okf-tools
+./scripts/install-agent-support.sh ~/my-project
+source ~/.bashrc
 ```
+
+This installs `okf` globally (via a persistent venv at `~/.local/share/okf-tools/`) and sets up steering + hooks in your workspace.
+
+> **Manual alternative:** `python3 -m venv .venv && source .venv/bin/activate && pip install -e .`
 
 ## Initialise a Bundle
 
@@ -54,7 +61,13 @@ This embeds all concepts using a local model (no API keys needed) and stores vec
 okf fetch "handling transient failures"
 ```
 
-Returns concepts ranked by semantic similarity.
+Returns concepts ranked by combined keyword + semantic relevance (hybrid mode, default).
+
+Other modes:
+```bash
+okf fetch "retry" --mode keyword     # BM25 full-text only (fast, no model load)
+okf fetch "resilience" --mode semantic  # Pure vector cosine similarity
+```
 
 ## Validate Compliance
 

@@ -67,7 +67,7 @@ The `okf` command is on PATH permanently (via `~/.bashrc`), so agents can call i
 |---------|---------|
 | `okf init` | Initialise a new OKF bundle |
 | `okf commit` | Create a new concept |
-| `okf fetch <query>` | Semantic search |
+| `okf fetch <query>` | Hybrid search (BM25 + semantic) |
 | `okf show <id>` | Display a concept |
 | `okf list` | Browse concepts (filterable) |
 | `okf update <id>` | Modify a concept |
@@ -83,6 +83,7 @@ All commands support `--format json|text|brief`. Output is JSON when piped (agen
 ## Key Design Decisions
 
 - **Markdown files are the source of truth** — the vector index is a derived sidecar, gitignored and rebuildable
+- **Hybrid search** — combines BM25 keyword matching with vector semantic similarity (no external services)
 - **Local embeddings** — fastembed + BAAI/bge-small-en-v1.5, no API keys needed
 - **Incremental indexing** — only re-embeds changed files
 - **Link graph** — parse markdown links between concepts for backlink/neighborhood queries
