@@ -106,6 +106,7 @@ def incremental_reindex(
                     "tags": concept.tags,
                     "mtime": concept.file_path.stat().st_mtime,
                     "snippet": concept.body[:200],
+                    "body": concept.body,
                 }
                 index.upsert(concept.concept_id, embedding, metadata)
                 # Update graph
@@ -164,6 +165,7 @@ def full_reindex(
                 "tags": concept.tags,
                 "mtime": concept.file_path.stat().st_mtime,
                 "snippet": concept.body[:200],
+                "body": concept.body,
             }
             index.upsert(concept.concept_id, embedding, metadata)
             targets = extract_links(concept, bundle_root)

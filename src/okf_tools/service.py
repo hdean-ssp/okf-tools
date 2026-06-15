@@ -200,14 +200,21 @@ def fetch_concepts(
     threshold: Optional[float] = None,
     type_filter: Optional[str] = None,
     tags_filter: Optional[List[str]] = None,
+    mode: str = "hybrid",
 ) -> List[SearchResult]:
     """Semantic search workflow."""
     index, _ = _open_index_and_graph(config)
     try:
-        query_embedding = embed_text(query, config.embedding_model)
         n = top_n or config.default_top_n
         t = threshold if threshold is not None else 0.0
-        results = index.search(query_embedding, n * 3, t)  # Over-fetch for filtering
+
+        if mode == "keyword":
+            results = index.search_keyword(query, n * 3)
+        else:
+            query_embedding = embed_text(query, config.embedding_model)
+            results = index.search(
+                query_embedding, n * 3, t, query=query, mode=mode
+            )
     finally:
         index.close()
 
@@ -410,6 +417,7 @@ def _embed_and_index(config: OkfConfig, concept: Concept) -> None:
             "tags": concept.tags,
             "mtime": concept.file_path.stat().st_mtime,
             "snippet": concept.body[:200],
+            "body": concept.body,
         }
         index.upsert(concept.concept_id, embedding, metadata)
         targets = extract_links(concept, config.bundle_path)

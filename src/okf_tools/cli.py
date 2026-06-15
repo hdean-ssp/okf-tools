@@ -115,6 +115,12 @@ def init(ctx: click.Context) -> None:
 @click.option("--threshold", type=float, help="Minimum similarity score")
 @click.option("--type", "type_filter", help="Filter by concept type")
 @click.option("--tags", help="Filter by tags (comma-separated)")
+@click.option(
+    "--mode",
+    type=click.Choice(["hybrid", "semantic", "keyword"]),
+    default="hybrid",
+    help="Search mode (default: hybrid)",
+)
 @click.pass_context
 def fetch(
     ctx: click.Context,
@@ -123,6 +129,7 @@ def fetch(
     threshold: Optional[float],
     type_filter: Optional[str],
     tags: Optional[str],
+    mode: str,
 ) -> None:
     """Semantic search over the knowledge bundle."""
     from .service import fetch_concepts
@@ -134,7 +141,9 @@ def fetch(
     try:
         config = load_config()
         tags_list = [t.strip() for t in tags.split(",")] if tags else None
-        results = fetch_concepts(config, query, top_n, threshold, type_filter, tags_list)
+        results = fetch_concepts(
+            config, query, top_n, threshold, type_filter, tags_list, mode=mode
+        )
         data = [
             {
                 "concept_id": r.concept_id,
