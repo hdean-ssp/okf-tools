@@ -396,7 +396,8 @@ def stats(ctx: click.Context) -> None:
 
     try:
         config = load_config()
-        result = get_stats(config)
+        bundle_name = ctx.obj.get("bundle_name")
+        result = get_stats(config, bundle_name=bundle_name)
         _output(ctx, result)
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -499,6 +500,19 @@ def _parse_commit_input(kwargs: dict) -> dict:
         data["check_duplicates"] = True
     if kwargs.get("force"):
         data["force"] = True
+
+    # Warn about unrecognized fields in JSON input
+    _KNOWN_COMMIT_FIELDS = {
+        "title", "content", "type", "tags", "timestamp", "description",
+        "path", "check_duplicates", "force",
+    }
+    unknown = set(data.keys()) - _KNOWN_COMMIT_FIELDS
+    if unknown:
+        import sys
+        print(
+            f"warning: unrecognized fields ignored: {', '.join(sorted(unknown))}",
+            file=sys.stderr,
+        )
 
     return data
 

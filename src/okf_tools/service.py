@@ -353,7 +353,7 @@ def list_concepts(
     if since:
         all_concepts = [
             c for c in all_concepts
-            if c.timestamp and c.timestamp >= since
+            if _concept_matches_since(c, since)
         ]
 
     # Sort by concept_id
@@ -455,9 +455,26 @@ def reindex(
     return result
 
 
-def get_stats(config: OkfConfig) -> Dict[str, Any]:
-    """Bundle health statistics."""
-    concepts = walk_concepts(config.bundle_path)
+def get_stats(config: OkfConfig, bundle_name: Optional[str] = None) -> Dict[str, Any]:
+    """Bundle health statistics.
+
+    If bundle_name is specified, shows stats for that bundle only.
+    Otherwise shows stats for the default bundle.
+    """
+    if bundle_name:
+        bundle = config.get_bundle(bundle_name)
+        if bundle is None:
+            from .errors import ConfigError
+            raise ConfigError(
+                "bundles",
+                f"Bundle '{bundle_name}' not found. "
+                f"Available: {', '.join(b.name for b in config.bundles)}",
+            )
+        bundle_path = bundle.path
+    else:
+        bundle_path = config.bundle_path
+
+    concepts = walk_concepts(bundle_path)
     concept_ids = {c.concept_id for c in concepts}
 
     # Type and tag distributions
@@ -469,21 +486,22 @@ def get_stats(config: OkfConfig) -> Dict[str, Any]:
         for tag in c.tags:
             tag_dist[tag] = tag_dist.get(tag, 0) + 1
 
-    # Graph stats
-    _, graph = _open_index_and_graph(config)
+    # Open the correct bundle's index/graph
+    if bundle_name:
+        index, graph = _open_index_and_graph_for_bundle(
+            config.get_bundle(bundle_name)
+        )
+    else:
+        index, graph = _open_index_and_graph(config)
+
     try:
         graph_stats = graph.get_stats(len(concepts))
         orphans = graph.get_orphans(concept_ids)
-    finally:
-        graph.close()
-
-    # Index metadata
-    index, _ = _open_index_and_graph(config)
-    try:
         last_sync = index.get_sync_timestamp()
         indexed_count = index.concept_count()
     finally:
         index.close()
+        graph.close()
 
     pending = len(concepts) - indexed_count
 
@@ -604,6 +622,46 @@ def _embed_and_index_for_bundle(config: OkfConfig, bundle: BundleRef, concept: C
     finally:
         index.close()
         graph.close()
+
+
+def _concept_matches_since(concept: Concept, since: str) -> None:
+    """Check if a concept was created/modified on or after the given date.
+
+    Uses frontmatter timestamp if available, otherwise falls back to file mtime.
+    """
+    from datetime import datetime
+
+    # Parse the since date
+    try:
+        since_dt = datetime.strptime(since, "%Y-%m-%d")
+    except ValueError:
+        try:
+            since_dt = datetime.fromisoformat(since)
+        except ValueError:
+            return False
+
+    # Check frontmatter timestamp first
+    if concept.timestamp:
+        ts_str = concept.timestamp
+        if isinstance(ts_str, datetime):
+            return ts_str >= since_dt
+        try:
+            concept_dt = datetime.strptime(ts_str, "%Y-%m-%d")
+            return concept_dt >= since_dt
+        except ValueError:
+            try:
+                concept_dt = datetime.fromisoformat(ts_str)
+                return concept_dt >= since_dt
+            except ValueError:
+                pass
+
+    # Fall back to file modification time
+    if concept.file_path and concept.file_path.exists():
+        mtime = concept.file_path.stat().st_mtime
+        file_dt = datetime.fromtimestamp(mtime)
+        return file_dt >= since_dt
+
+    return False
 
 
 def _check_duplicates(config: OkfConfig, content: str, force: bool) -> None:

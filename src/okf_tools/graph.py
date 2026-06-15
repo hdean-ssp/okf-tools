@@ -13,17 +13,21 @@ from .bundle import Concept
 
 # Pattern to match markdown links: [text](url)
 _LINK_PATTERN = re.compile(r"\[(?:[^\]]*)\]\(([^)]+)\)")
+# Pattern to match wikilinks: [[concept-id]] or [[concept-id|display text]]
+_WIKILINK_PATTERN = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 
 
 def extract_links(concept: Concept, bundle_root: Path) -> List[str]:
-    """Parse markdown links from body, resolve to concept_ids.
+    """Parse markdown links and wikilinks from body, resolve to concept_ids.
 
-    Includes only internal links (start with / or ./, end with .md).
-    Excludes external URLs, fragment-only anchors, and non-.md targets.
+    Supports:
+    - Markdown links: [text](path.md) — internal only (no http://)
+    - Wikilinks: [[concept-id]] or [[concept-id|display text]]
     """
     links: List[str] = []
     concept_dir = concept.file_path.parent
 
+    # Markdown-style links
     for match in _LINK_PATTERN.finditer(concept.body):
         url = match.group(1).strip()
 
@@ -55,6 +59,18 @@ def extract_links(concept: Concept, bundle_root: Path) -> List[str]:
             links.append(concept_id)
         except ValueError:
             continue  # Outside bundle root
+
+    # Wikilinks: [[concept-id]] or [[concept-id|display text]]
+    for match in _WIKILINK_PATTERN.finditer(concept.body):
+        target = match.group(1).strip()
+        # Normalize: treat as concept_id directly (lowercase, hyphens)
+        # If it looks like a path with .md, strip the extension
+        if target.endswith(".md"):
+            target = target[:-3]
+        # Convert spaces to hyphens for slug matching
+        target = target.replace(" ", "-").lower()
+        if target and target not in links:
+            links.append(target)
 
     return links
 

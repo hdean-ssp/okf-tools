@@ -20,7 +20,7 @@ DEFAULTS: Dict[str, Any] = {
     "index_path": ".okf/index",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "default_top_n": 5,
-    "similarity_threshold": 1.0,
+    "similarity_threshold": 0.85,
     "auto_git_add": True,
     "skills_paths": [".kiro/steering/", "~/.config/okf/skills/"],
     "validation_level": "standard",
