@@ -15,8 +15,7 @@ class TestDefaults:
         assert defaults["bundle_path"] == "."
         assert defaults["embedding_model"] == "BAAI/bge-small-en-v1.5"
         assert defaults["default_top_n"] == 5
-        assert defaults["validation_level"] == "standard"
-        assert isinstance(defaults["skills_paths"], list)
+        assert defaults["similarity_threshold"] == 0.85
 
 
 class TestFindBundleRoot:
@@ -38,12 +37,11 @@ class TestLoadConfig:
     def test_loads_bundle_config(self, tmp_path):
         okf_dir = tmp_path / ".okf"
         okf_dir.mkdir()
-        config_data = {"default_top_n": 10, "validation_level": "strict"}
+        config_data = {"default_top_n": 10}
         (okf_dir / "config.json").write_text(json.dumps(config_data))
 
         config = load_config(tmp_path)
         assert config.default_top_n == 10
-        assert config.validation_level == "strict"
         # Defaults still applied for unset fields
         assert config.embedding_model == "BAAI/bge-small-en-v1.5"
 

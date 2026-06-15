@@ -1,0 +1,12 @@
+{
+  "name": "OKF Knowledge Awareness",
+  "version": "1.0.0",
+  "description": "Points the agent to okf-tools after each prompt so it checks for existing knowledge",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "You have access to okf-tools for managing project knowledge. Refer to the agent/AGENT.md file for command reference. If this task relates to the codebase or project-specific knowledge, run `okf fetch` with a relevant query before proceeding."
+  }
+}

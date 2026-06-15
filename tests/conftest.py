@@ -21,10 +21,8 @@ def tmp_bundle(tmp_path: Path) -> Path:
         "index_path": ".okf/index",
         "embedding_model": "BAAI/bge-small-en-v1.5",
         "default_top_n": 5,
-        "similarity_threshold": 1.0,
+        "similarity_threshold": 0.85,
         "auto_git_add": False,
-        "skills_paths": [],
-        "validation_level": "standard",
     }
     (okf_dir / "config.json").write_text(json.dumps(config), encoding="utf-8")
 
@@ -37,24 +35,13 @@ def tmp_bundle(tmp_path: Path) -> Path:
 @pytest.fixture
 def sample_config(tmp_bundle: Path) -> OkfConfig:
     """Return an OkfConfig pointing to the tmp_bundle."""
-    from okf_tools.config import BundleRef
-
-    bundle_ref = BundleRef(
-        name="test",
-        path=tmp_bundle,
-        writable=True,
-        default=True,
-    )
     return OkfConfig(
         bundle_path=tmp_bundle,
         index_path=Path(".okf/index"),
         embedding_model="BAAI/bge-small-en-v1.5",
         default_top_n=5,
-        similarity_threshold=1.0,
+        similarity_threshold=0.85,
         auto_git_add=False,
-        skills_paths=[],
-        validation_level="standard",
-        bundles=[bundle_ref],
     )
 
 

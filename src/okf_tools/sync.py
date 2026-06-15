@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,7 +11,6 @@ from typing import Dict, List
 from .bundle import Concept, is_concept_file, parse_concept, walk_concepts
 from .config import OkfConfig
 from .errors import ParseError
-from .graph import LinkGraph, extract_links
 from .search import VectorIndex, embed_batch
 
 
@@ -70,13 +70,12 @@ def detect_changes(bundle_root: Path, index: VectorIndex) -> ChangeSet:
 
 
 def incremental_reindex(
-    bundle_root: Path, index: VectorIndex, graph: LinkGraph, config: OkfConfig
+    bundle_root: Path, index: VectorIndex, config: OkfConfig
 ) -> SyncSummary:
     """Process only changed files."""
     # Check model compatibility
     warning = index.check_model_compatibility(config.embedding_model)
     if warning:
-        import sys
         print(f"warning: {warning}", file=sys.stderr)
 
     changes = detect_changes(bundle_root, index)
@@ -115,9 +114,6 @@ def incremental_reindex(
                     "body": concept.body,
                 }
                 index.upsert(concept.concept_id, embedding, metadata)
-                # Update graph
-                targets = extract_links(concept, bundle_root)
-                graph.set_links(concept.concept_id, targets)
 
     summary.added = len(changes.added) - len(
         [s for s in summary.skipped if any(str(f) == s for f in changes.added)]
@@ -129,7 +125,6 @@ def incremental_reindex(
     # Remove deleted
     for concept_id in changes.deleted:
         index.delete(concept_id)
-        graph.remove_concept(concept_id)
     summary.removed = len(changes.deleted)
 
     # Persist timestamp
@@ -140,14 +135,13 @@ def incremental_reindex(
 
 
 def full_reindex(
-    bundle_root: Path, index: VectorIndex, graph: LinkGraph, config: OkfConfig
+    bundle_root: Path, index: VectorIndex, config: OkfConfig
 ) -> SyncSummary:
     """Drop all index data and rebuild from scratch."""
     summary = SyncSummary()
 
     # Clear existing data
     index.clear()
-    graph.clear()
 
     # Walk and process all concepts
     concepts = walk_concepts(bundle_root)
@@ -171,8 +165,6 @@ def full_reindex(
                 "body": concept.body,
             }
             index.upsert(concept.concept_id, embedding, metadata)
-            targets = extract_links(concept, bundle_root)
-            graph.set_links(concept.concept_id, targets)
 
     summary.added = len(concepts) - len(summary.skipped)
     index.set_sync_timestamp(time.time())

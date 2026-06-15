@@ -1,4 +1,7 @@
-"""Click-based CLI: single `okf` entry point with subcommands."""
+"""Click-based CLI: single `okf` entry point with subcommands.
+
+Core-only: init, commit, fetch, show, list, update, delete, reindex, stats.
+"""
 
 from __future__ import annotations
 
@@ -39,7 +42,7 @@ def _output(ctx: click.Context, data: Any) -> None:
             else:
                 click.echo(str(item))
     else:
-        # Text format — handle different data shapes
+        # Text format
         if isinstance(data, dict):
             _print_dict(data)
         elif isinstance(data, list):
@@ -91,97 +94,33 @@ def _handle_error(ctx: click.Context, message: str, exit_code: int = 1) -> None:
     default=None,
     help="Output format (default: text for TTY, json for pipes)",
 )
-@click.option(
-    "--bundle", "-b", "bundle_name",
-    default=None,
-    help="Target a specific bundle by name (for multi-bundle setups)",
-)
 @click.version_option(
     version=__version__,
     prog_name="okf-tools",
     message="%(prog)s %(version)s (targeting OKF spec v" + OKF_SPEC_VERSION + ")",
 )
 @click.pass_context
-def okf(ctx: click.Context, fmt: Optional[str], bundle_name: Optional[str]) -> None:
+def okf(ctx: click.Context, fmt: Optional[str]) -> None:
     """OKF bundle tools — search, author, and navigate knowledge."""
     ctx.ensure_object(dict)
     ctx.obj["format"] = _detect_format(fmt)
-    ctx.obj["bundle_name"] = bundle_name
-
-    # Helpful nudge if -b is used but only one bundle exists
-    if bundle_name:
-        try:
-            config = load_config()
-            if len(config.bundles) <= 1 and config.get_bundle(bundle_name) is None:
-                click.echo(
-                    f"hint: Bundle '{bundle_name}' not found. "
-                    f"Only one bundle configured. "
-                    f"Use `okf init --register --name <name>` to add more.",
-                    err=True,
-                )
-        except Exception:
-            pass  # Config loading errors handled by subcommands
 
 
 # --- Commands ---
 
 
 @okf.command()
-@click.option("--register", is_flag=True, help="Also register this bundle in ~/.config/okf/config.json")
-@click.option("--name", "bundle_name_opt", default=None, help="Name for the bundle (defaults to directory name)")
 @click.pass_context
-def init(ctx: click.Context, register: bool, bundle_name_opt: Optional[str]) -> None:
+def init(ctx: click.Context) -> None:
     """Initialise a new OKF bundle in the current directory."""
     from .service import init_bundle
 
     try:
         path = Path.cwd()
         init_bundle(path)
-
-        if register:
-            _register_bundle_in_user_config(path, bundle_name_opt)
-
         _output(ctx, {"status": "ok", "message": "Bundle initialised"})
     except OkfError as e:
         _handle_error(ctx, str(e))
-
-
-def _register_bundle_in_user_config(bundle_path: Path, name: Optional[str] = None) -> None:
-    """Add a bundle entry to the user-level config at ~/.config/okf/config.json."""
-    import json as _json
-
-    user_config_path = Path.home() / ".config" / "okf" / "config.json"
-    user_config_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Load existing or create new
-    if user_config_path.exists():
-        text = user_config_path.read_text(encoding="utf-8")
-        data = _json.loads(text)
-    else:
-        data = {}
-
-    # Ensure bundles array exists
-    if "bundles" not in data:
-        data["bundles"] = []
-
-    bundle_name = name or bundle_path.name
-    path_str = str(bundle_path)
-
-    # Check if already registered
-    for entry in data["bundles"]:
-        if entry.get("name") == bundle_name:
-            return  # Already registered, no-op
-
-    # Add the new bundle
-    new_entry = {"name": bundle_name, "path": path_str}
-    # If this is the first bundle, make it default
-    if not data["bundles"]:
-        new_entry["default"] = True
-    data["bundles"].append(new_entry)
-
-    user_config_path.write_text(
-        _json.dumps(data, indent=2) + "\n", encoding="utf-8"
-    )
 
 
 @okf.command()
@@ -222,10 +161,8 @@ def fetch(
     try:
         config = load_config()
         tags_list = [t.strip() for t in tags.split(",")] if tags else None
-        bundle_name = ctx.obj.get("bundle_name")
         results = fetch_concepts(
-            config, query, top_n, threshold, type_filter, tags_list,
-            mode=mode, bundle_name=bundle_name,
+            config, query, top_n, threshold, type_filter, tags_list, mode=mode,
         )
         data = [
             {
@@ -233,7 +170,6 @@ def fetch(
                 "title": r.title,
                 "score": r.score,
                 "snippet": r.snippet,
-                **({"bundle": r.bundle} if r.bundle else {}),
             }
             for r in results
         ]
@@ -261,23 +197,20 @@ def commit(ctx: click.Context, **kwargs) -> None:
     try:
         config = load_config()
         input_data = _parse_commit_input(kwargs)
-        bundle_name = ctx.obj.get("bundle_name")
 
         # Dry run: show what would happen without persisting
         if kwargs.get("dry_run"):
-            bundle = config.get_writable_bundle(bundle_name)
             _output(ctx, {
                 "dry_run": True,
                 "title": input_data.get("title"),
                 "type": input_data.get("type"),
                 "tags": input_data.get("tags", []),
-                "target_bundle": bundle.name,
                 "target_path": input_data.get("path", "(bundle root)"),
                 "content_length": len(input_data.get("content", "")),
             })
             return
 
-        concept_id = commit_concept(config, input_data, bundle_name=bundle_name)
+        concept_id = commit_concept(config, input_data)
         _output(ctx, {"concept_id": concept_id})
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -299,8 +232,7 @@ def update(ctx: click.Context, concept_id: str, **kwargs) -> None:
     try:
         config = load_config()
         updates = _parse_update_input(kwargs)
-        bundle_name = ctx.obj.get("bundle_name")
-        result_id = update_concept(config, concept_id, updates, bundle_name=bundle_name)
+        result_id = update_concept(config, concept_id, updates)
         _output(ctx, {"concept_id": result_id})
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -315,8 +247,7 @@ def delete(ctx: click.Context, concept_id: str) -> None:
 
     try:
         config = load_config()
-        bundle_name = ctx.obj.get("bundle_name")
-        delete_concept(config, concept_id, bundle_name=bundle_name)
+        delete_concept(config, concept_id)
         _output(ctx, {"status": "ok", "concept_id": concept_id})
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -341,13 +272,9 @@ def list_cmd(ctx: click.Context, type_filter, tags, since, limit, path_filter, l
     try:
         config = load_config()
         tags_list = [t.strip() for t in tags.split(",")] if tags else None
-        bundle_name = ctx.obj.get("bundle_name")
-        concepts = list_concepts(
-            config, type_filter, tags_list, since, limit, path_filter,
-            bundle_name=bundle_name,
-        )
+        concepts = list_concepts(config, type_filter, tags_list, since, limit, path_filter)
         data = [
-            {"concept_id": c.concept_id, "title": c.title, "type": c.type, "bundle": c.bundle}
+            {"concept_id": c.concept_id, "title": c.title, "type": c.type}
             for c in concepts
         ]
         _output(ctx, data)
@@ -366,20 +293,12 @@ def show(ctx: click.Context, concept_id: str) -> None:
         config = load_config()
         concept = show_concept(config, concept_id)
 
-        # Determine source bundle name
-        bundle_label = None
-        for bundle in config.bundles:
-            if concept.file_path.is_relative_to(bundle.path):
-                bundle_label = bundle.name
-                break
-
         fmt = ctx.obj["format"]
         if fmt == "json":
             data = {
                 "concept_id": concept.concept_id,
                 "frontmatter": concept.frontmatter,
                 "body": concept.body,
-                "bundle": bundle_label,
             }
             click.echo(json.dumps(data, indent=2, default=str))
         elif fmt == "brief":
@@ -393,48 +312,22 @@ def show(ctx: click.Context, concept_id: str) -> None:
             click.echo(f"type: {concept.type}")
             if concept.tags:
                 click.echo(f"tags: {', '.join(concept.tags)}")
-            if bundle_label:
-                click.echo(f"bundle: {bundle_label}")
             click.echo(f"\n{concept.body}")
     except OkfError as e:
         _handle_error(ctx, str(e))
 
 
 @okf.command()
-@click.argument("concept_id")
-@click.option("--direction", type=click.Choice(["in", "out", "both"]), default="both")
-@click.option("--depth", type=int, default=1, help="BFS depth (1-10)")
-@click.pass_context
-def links(ctx: click.Context, concept_id: str, direction: str, depth: int) -> None:
-    """Show link graph for a concept."""
-    from .service import get_links
-
-    try:
-        config = load_config()
-        depth = max(1, min(10, depth))
-        result = get_links(config, concept_id, direction, depth)
-        _output(ctx, result)
-    except OkfError as e:
-        _handle_error(ctx, str(e))
-
-
-@okf.command()
 @click.option("--full", is_flag=True, help="Full rebuild (discard existing index)")
-@click.option("--lint", "run_lint", is_flag=True, help="Validate bundle during reindex")
 @click.pass_context
-def reindex(ctx: click.Context, full: bool, run_lint: bool) -> None:
+def reindex(ctx: click.Context, full: bool) -> None:
     """Rebuild the vector index."""
     from .service import reindex as do_reindex
 
     try:
         config = load_config()
-        bundle_name = ctx.obj.get("bundle_name")
-        result = do_reindex(config, full=full, lint=run_lint, bundle_name=bundle_name)
+        result = do_reindex(config, full=full)
         _output(ctx, result)
-
-        # Non-zero exit if lint found errors
-        if run_lint and result.get("lint", {}).get("errors", 0) > 0:
-            ctx.exit(1)
     except OkfError as e:
         _handle_error(ctx, str(e))
 
@@ -447,79 +340,8 @@ def stats(ctx: click.Context) -> None:
 
     try:
         config = load_config()
-        bundle_name = ctx.obj.get("bundle_name")
-        result = get_stats(config, bundle_name=bundle_name)
+        result = get_stats(config)
         _output(ctx, result)
-    except OkfError as e:
-        _handle_error(ctx, str(e))
-
-
-@okf.command()
-@click.pass_context
-def skills(ctx: click.Context) -> None:
-    """List installed skill packs."""
-    from .service import list_skills
-
-    try:
-        config = load_config()
-        skill_list = list_skills(config)
-        data = [
-            {"filename": s.filename, "title": s.title, "description": s.description}
-            for s in skill_list
-        ]
-        _output(ctx, data)
-    except OkfError as e:
-        _handle_error(ctx, str(e))
-
-
-@okf.command()
-@click.option("--warn-only", is_flag=True, help="Always exit 0 regardless of findings")
-@click.option("--path", "path_filter", help="Validate only this subdirectory")
-@click.option(
-    "--rule",
-    type=click.Choice(["frontmatter", "structure", "links", "types"]),
-    help="Run only this rule category",
-)
-@click.pass_context
-def lint(
-    ctx: click.Context,
-    warn_only: bool,
-    path_filter: Optional[str],
-    rule: Optional[str],
-) -> None:
-    """Validate bundle for OKF compliance."""
-    from .service import lint_bundle
-
-    try:
-        config = load_config()
-        report = lint_bundle(config, path_filter, rule)
-
-        fmt = ctx.obj["format"]
-        if fmt == "json":
-            data = {
-                "files_checked": report.files_checked,
-                "errors": report.errors,
-                "warnings": report.warnings,
-                "diagnostics": [
-                    {"file": d.file, "rule": d.rule, "severity": d.severity, "message": d.message}
-                    for d in report.diagnostics
-                ],
-            }
-            click.echo(json.dumps(data, indent=2))
-        else:
-            if not report.diagnostics:
-                click.echo(f"✓ Bundle clean ({report.files_checked} files checked)")
-            else:
-                for d in report.diagnostics:
-                    icon = "✗" if d.severity == "error" else "⚠"
-                    click.echo(f"{icon} {d.file}: [{d.rule}] {d.message}")
-                click.echo(
-                    f"\n{report.errors} error(s), {report.warnings} warning(s) "
-                    f"in {report.files_checked} files"
-                )
-
-        if not warn_only and report.errors > 0:
-            ctx.exit(1)
     except OkfError as e:
         _handle_error(ctx, str(e))
 
@@ -551,19 +373,6 @@ def _parse_commit_input(kwargs: dict) -> dict:
         data["check_duplicates"] = True
     if kwargs.get("force"):
         data["force"] = True
-
-    # Warn about unrecognized fields in JSON input
-    _KNOWN_COMMIT_FIELDS = {
-        "title", "content", "type", "tags", "timestamp", "description",
-        "path", "check_duplicates", "force",
-    }
-    unknown = set(data.keys()) - _KNOWN_COMMIT_FIELDS
-    if unknown:
-        import sys
-        print(
-            f"warning: unrecognized fields ignored: {', '.join(sorted(unknown))}",
-            file=sys.stderr,
-        )
 
     return data
 
