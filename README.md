@@ -87,7 +87,7 @@ All commands support `--format json|text|brief`. Output is JSON when piped (agen
 - **Hybrid search** — combines BM25 keyword matching with vector semantic similarity (no external services). Searches across all configured bundles
 - **Local embeddings** — fastembed + BAAI/bge-small-en-v1.5, no API keys needed
 - **Incremental indexing** — only re-embeds changed files
-- **Link graph** — parse markdown links between concepts for backlink/neighborhood queries
+- **Link graph** — parse `[[wikilinks]]` and markdown links between concepts for backlink/neighborhood queries
 - **Compliance-first** — `okf lint` validates structure, links, types, and frontmatter
 - **Extensible** — drop-in skill packs for domain-specific agent guidance
 

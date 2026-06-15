@@ -13,6 +13,13 @@ okf --format json show concept-id
 okf --format json lint
 ```
 
+The `--format` option is also available per-command on `list` and `fetch`:
+
+```bash
+okf list --format brief        # Works (no need for global position)
+okf fetch "query" --format json
+```
+
 All JSON output is valid, parseable, and contains no decorative text.
 
 ## Recommended Agent Workflow
@@ -31,12 +38,14 @@ Uses hybrid search by default (keyword + semantic). For exact term lookups use `
 okf commit --check-duplicates --json '{
   "title": "What I Learned",
   "type": "Pattern",
-  "content": "Detailed description...",
+  "content": "Detailed description... Link to related: [[other-concept]]",
   "tags": ["relevant", "tags"]
 }'
 ```
 
-Always use `--check-duplicates` to avoid redundant entries.
+Always use `--check-duplicates` to avoid redundant entries. This will **block the commit** (exit code 1) if semantically similar content already exists in any bundle (threshold: 0.85 cosine similarity). Use `--force` to override.
+
+Use `[[concept-id]]` wikilinks in content to create graph edges between concepts.
 
 ### 3. Lint after bulk changes
 

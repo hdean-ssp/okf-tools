@@ -11,8 +11,8 @@ okf --version
 okf --help
 ```
 
-- `--format`: Override output format. Default: `text` for TTY, `json` when piped.
-- `--bundle` / `-b`: Target a specific named bundle. Applies to all subcommands. For write commands (commit, update, delete) this sets the write target. For read commands (fetch, list, show, links, stats) this limits scope to one bundle. Without `-b`, reads search all bundles and writes go to the default bundle.
+- `--format`: Override output format. Default: `text` for TTY, `json` when piped. Also available as a per-command option on `list` and `fetch` (e.g. `okf list --format brief`).
+- `--bundle` / `-b`: Target a specific named bundle. Applies to all subcommands. For write commands (commit, update, delete) this sets the write target. For read commands (fetch, list, show, links, stats, reindex) this limits scope to one bundle. Without `-b`, reads search all bundles and writes go to the default bundle.
 
 ---
 
@@ -65,8 +65,12 @@ okf commit --json '...' --check-duplicates --force
 | `--json` | JSON string with all fields |
 | `--file` | Path to JSON file |
 | `--path` | Target subdirectory |
-| `--check-duplicates` | Warn if similar concepts exist |
+| `--check-duplicates` | Block if similar concepts exist (similarity threshold: 0.85) |
 | `--force` | Commit despite duplicates |
+
+Unrecognized fields in JSON input are silently ignored (a warning is printed to stderr).
+
+**Linking:** Use `[[concept-id]]` or `[[concept-id|Display Text]]` wikilinks in concept content to create graph edges. These are automatically parsed and indexed into the link graph on commit/reindex.
 
 **Multi-bundle:**
 ```bash
@@ -111,9 +115,20 @@ okf list --tags "reliability,performance"
 okf list --since 2026-01-01
 okf list --path patterns/
 okf list --limit 10
+okf list --format brief              # Per-command format override
 ```
 
-Filters combine with AND logic.
+Filters combine with AND logic. `--since` checks the frontmatter `timestamp` field first, falling back to file modification time. When no concepts match the filters, a "No matching concepts." message is printed to stderr (exit code remains 0).
+
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `--type` | Filter by concept type |
+| `--tags` | Filter by tags (comma-separated, OR logic) |
+| `--since` | Only concepts created/modified on or after this date (ISO 8601) |
+| `--limit` | Maximum results |
+| `--path` | Filter by subdirectory |
+| `--format` | Output format: `json`, `text`, or `brief` (overrides global) |
 
 ---
 
@@ -139,6 +154,7 @@ okf fetch "auth patterns" --top-n 10 --threshold 0.3
 okf fetch "database" --type "Pattern" --tags "performance"
 okf fetch "retry" --mode keyword       # BM25 full-text only
 okf fetch "resilience" --mode semantic  # Vector cosine only
+okf fetch "query" --format json        # Per-command format override
 ```
 
 **Options:**
@@ -149,6 +165,7 @@ okf fetch "resilience" --mode semantic  # Vector cosine only
 | `--type` | Filter by type |
 | `--tags` | Filter by tags (comma-separated) |
 | `--mode` | `hybrid` (default), `semantic`, or `keyword` |
+| `--format` | Output format: `json`, `text`, or `brief` (overrides global) |
 
 **Search modes:**
 - **hybrid** — merges BM25 keyword scores (40%) with vector cosine similarity (60%). Best for most queries.
@@ -161,7 +178,7 @@ okf fetch "resilience" --mode semantic  # Vector cosine only
 
 ## okf links \<concept-id\>
 
-Show link graph (inbound + outbound).
+Show link graph (inbound + outbound). Links are parsed from concept content — both markdown links (`[text](./other.md)`) and wikilinks (`[[concept-id]]` or `[[concept-id|Display Text]]`) are supported.
 
 ```bash
 okf links patterns/retry
@@ -205,9 +222,10 @@ okf --format json lint  # CI-friendly output
 Rebuild the vector index.
 
 ```bash
-okf reindex          # Incremental (only changed files)
+okf reindex          # Incremental (only changed files) for default bundle
 okf reindex --full   # Full rebuild from scratch
 okf reindex --lint   # Validate during reindex
+okf -b team reindex  # Reindex a specific bundle
 ```
 
 ---
@@ -217,7 +235,8 @@ okf reindex --lint   # Validate during reindex
 Bundle health metrics.
 
 ```bash
-okf stats
+okf stats              # Stats for the default bundle
+okf -b team stats      # Stats for a specific bundle
 ```
 
 Shows: concept count, type/tag distribution, link density, orphans, index freshness.

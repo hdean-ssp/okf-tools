@@ -210,8 +210,10 @@ When committing new knowledge, route to the correct bundle:
 
 - Commands output JSON when piped (default for agents) — parse it directly
 - Use `okf --format json <command>` to force JSON output
+- `--format` is also available per-command on `list` and `fetch`: `okf list --format brief`
 - Use `okf --format brief list` for compact scanning (concept_id\ttitle per line)
 - Fetch results include a `bundle` field showing which bundle each result came from
+- When filters produce zero results, "No matching concepts." is printed to stderr
 
 ## Concept Types to Use
 

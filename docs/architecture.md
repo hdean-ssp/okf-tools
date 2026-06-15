@@ -18,7 +18,7 @@ The CLI is a thin Click shell. The service layer orchestrates workflows. Domain 
 | `service.py` | Workflow orchestration (commit, fetch, lint, etc.) |
 | `bundle.py` | Parse/write OKF files, validate frontmatter, manage index.md |
 | `search.py` | Hybrid search: vector index (sqlite-vec) + FTS5 keyword index, embeddings (fastembed) |
-| `graph.py` | Link parsing, adjacency storage, BFS traversal |
+| `graph.py` | Link parsing (markdown links + `[[wikilinks]]`), adjacency storage, BFS traversal |
 | `sync.py` | Change detection, incremental/full reindexing |
 | `validation.py` | Bundle-wide compliance checks (lint) |
 | `config.py` | Configuration loading and merging |
