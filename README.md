@@ -1,16 +1,20 @@
-# okf-tools
+# okf-tools (ssp-full)
+
+> **This is the extended branch.** For the minimal core tool (init → commit → fetch → reindex), see the [`main` branch](https://github.com/hdean-ssp/okf-tools/tree/main).
 
 A companion CLI and library for working with [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundles — filling the gaps that the spec intentionally leaves open.
 
-**What it does:** Makes OKF knowledge bundles queryable, navigable, and agent-friendly via semantic search, link graph traversal, compliance linting, and progressive disclosure.
+**What it does:** Makes OKF knowledge bundles queryable, navigable, and agent-friendly via semantic search, link graph traversal, compliance linting, multi-bundle collaboration, and progressive disclosure.
 
 > **OKF-compatible with extensions:** Bundles produced by okf-tools are valid OKF v0.1. The tool adds features on top (hybrid search, FTS indexing, link graph) that don't break spec compliance. See [Architecture > Extensions Beyond OKF](docs/architecture.md#extensions-beyond-okf) for details.
 
 ## Quick Start
 
+Requires **Python 3.9+** and **bash**.
+
 ```bash
 # Clone and install (one-time setup)
-git clone https://github.com/hdean-ssp/okf-tools.git
+git clone https://github.com/hdean-ssp/okf-tools.git -b ssp-full
 cd okf-tools
 ./scripts/install-agent-support.sh ~/my-project
 source ~/.bashrc
@@ -20,11 +24,14 @@ cd ~/my-project
 okf init
 
 # Create a concept
-okf commit --title "Retry Pattern" --type "Pattern" \
-  --content "Use exponential backoff for transient failures." \
-  --tags "reliability,networking"
+okf commit --check-duplicates --json '{
+  "title": "Retry Pattern",
+  "type": "Pattern",
+  "content": "Use exponential backoff for transient failures.",
+  "tags": ["reliability", "networking"]
+}'
 
-# Build the search index
+# Build the search index (first run downloads ~30MB embedding model)
 okf reindex
 
 # Search it
@@ -80,7 +87,7 @@ The `okf` command is on PATH permanently (via `~/.bashrc`), so agents can call i
 | `okf stats` | Bundle health metrics |
 | `okf skills` | List installed skill packs |
 
-All commands support `--format json|text|brief`. Output is JSON when piped (agent-friendly), text when interactive.
+All commands support `--format json|text|brief`. Output is JSON when piped (agent-friendly), text when interactive. `okf commit` also supports `--dry-run` to preview without writing.
 
 ## Key Design Decisions
 
@@ -126,13 +133,18 @@ See [Getting Started](docs/getting-started.md#multi-bundle-setup) for full setup
 ## Development
 
 ```bash
-git clone https://github.com/hdean-ssp/okf-tools.git
+git clone https://github.com/hdean-ssp/okf-tools.git -b ssp-full
 cd okf-tools
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```
+
+## Branches
+
+- **`main`** — minimal core tool (init, commit, fetch, show, reindex). Best starting point for most users.
+- **`ssp-full`** (this branch) — extended version with multi-bundle, link graph, lint, skills, steering, hooks, and the install script. Used internally at SSP.
 
 ## License
 
