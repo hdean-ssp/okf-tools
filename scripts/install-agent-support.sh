@@ -109,7 +109,7 @@ You have access to `okf` — a CLI for managing an OKF knowledge bundle in this 
 
 | Command | When to Use |
 |---------|-------------|
-| `okf fetch "<query>"` | Before starting work that might have prior context. Searches semantically — describe what you're looking for in natural language. |
+| `okf fetch "<query>"` | Before starting work that might have prior context. Uses hybrid search (keyword + semantic) by default. Use `--mode keyword` for exact term lookups, `--mode semantic` for pure meaning-based search. |
 | `okf show <concept-id>` | After fetch returns relevant results. Loads the full concept body into your context. |
 | `okf list [--type X] [--tags Y]` | When browsing what's available. Use `--format brief` to scan without loading full content. |
 | `okf links <concept-id> [--depth N]` | When exploring related concepts. Shows what links to/from a concept. |

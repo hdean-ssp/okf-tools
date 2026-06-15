@@ -10,9 +10,11 @@ You have access to an OKF knowledge bundle via the `okf` CLI. Use it to persist 
 
 ## When to Fetch
 
-- At the start of each interaction, run `okf fetch "<brief description of task>"` to check for relevant prior knowledge.
+- At the start of each interaction, run `okf fetch "<brief description of task>"` to check for relevant prior knowledge. Uses hybrid search (keyword + semantic) by default.
 - Before architectural decisions, check for existing rationale.
 - When encountering unfamiliar patterns, search first.
+- Use `--mode keyword` for exact term lookups (faster, no model load).
+- Use `--mode semantic` when the exact words don't matter but the meaning does.
 
 ## When to Commit
 
@@ -34,7 +36,9 @@ You have access to an OKF knowledge bundle via the `okf` CLI. Use it to persist 
 ## Command Quick Reference
 
 ```
-okf fetch "query"               # Semantic search
+okf fetch "query"               # Hybrid search (keyword + semantic, default)
+okf fetch "query" --mode keyword   # BM25 full-text only (fast, no model load)
+okf fetch "query" --mode semantic  # Pure vector cosine similarity
 okf commit --json '{...}'       # Create concept
 okf show <concept-id>           # Read full concept
 okf links <concept-id>          # See connections

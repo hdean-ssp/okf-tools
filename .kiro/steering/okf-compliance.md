@@ -30,3 +30,7 @@ okf lint --format json
 ```
 
 This outputs machine-readable diagnostics suitable for CI reporting tools. Exit code 1 indicates errors were found.
+
+## OKF Spec Version
+
+This project targets OKF v0.1. The vendored spec lives at `spec/OKF_SPEC_v0.1.md`. The version constant is `OKF_SPEC_VERSION` in `src/okf_tools/__init__.py`. When updating compliance rules, cross-reference against the vendored spec.
