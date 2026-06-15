@@ -30,6 +30,9 @@ def _output(ctx: click.Context, data: Any) -> None:
     if fmt == "json":
         click.echo(json.dumps(data, indent=2, default=str))
     elif fmt == "brief" and isinstance(data, list):
+        if not data:
+            click.echo("No matching concepts.", err=True)
+            return
         for item in data:
             if isinstance(item, dict):
                 click.echo(f"{item.get('concept_id', '')}\t{item.get('title', '')}")
@@ -40,6 +43,9 @@ def _output(ctx: click.Context, data: Any) -> None:
         if isinstance(data, dict):
             _print_dict(data)
         elif isinstance(data, list):
+            if not data:
+                click.echo("No matching concepts.", err=True)
+                return
             for item in data:
                 if isinstance(item, dict):
                     _print_dict(item)
@@ -172,6 +178,8 @@ def _register_bundle_in_user_config(bundle_path: Path, name: Optional[str] = Non
     default="hybrid",
     help="Search mode (default: hybrid)",
 )
+@click.option("--format", "local_format", type=click.Choice(["json", "text", "brief"]),
+              default=None, help="Output format (overrides global --format)")
 @click.pass_context
 def fetch(
     ctx: click.Context,
@@ -181,9 +189,13 @@ def fetch(
     type_filter: Optional[str],
     tags: Optional[str],
     mode: str,
+    local_format: Optional[str],
 ) -> None:
     """Semantic search over the knowledge bundle."""
     from .service import fetch_concepts
+
+    if local_format:
+        ctx.obj["format"] = local_format
 
     if not query.strip():
         _handle_error(ctx, "A non-empty query is required", exit_code=2)
@@ -282,10 +294,15 @@ def delete(ctx: click.Context, concept_id: str) -> None:
 @click.option("--since", help="Filter by timestamp (ISO 8601 date)")
 @click.option("--limit", type=int, help="Maximum results")
 @click.option("--path", "path_filter", help="Filter by subdirectory")
+@click.option("--format", "local_format", type=click.Choice(["json", "text", "brief"]),
+              default=None, help="Output format (overrides global --format)")
 @click.pass_context
-def list_cmd(ctx: click.Context, type_filter, tags, since, limit, path_filter) -> None:
+def list_cmd(ctx: click.Context, type_filter, tags, since, limit, path_filter, local_format) -> None:
     """List concepts in the bundle."""
     from .service import list_concepts
+
+    if local_format:
+        ctx.obj["format"] = local_format
 
     try:
         config = load_config()

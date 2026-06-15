@@ -629,7 +629,7 @@ def _concept_matches_since(concept: Concept, since: str) -> None:
 
     Uses frontmatter timestamp if available, otherwise falls back to file mtime.
     """
-    from datetime import datetime
+    from datetime import date, datetime
 
     # Parse the since date
     try:
@@ -640,26 +640,32 @@ def _concept_matches_since(concept: Concept, since: str) -> None:
         except ValueError:
             return False
 
+    since_date = since_dt.date()
+
     # Check frontmatter timestamp first
     if concept.timestamp:
-        ts_str = concept.timestamp
-        if isinstance(ts_str, datetime):
-            return ts_str >= since_dt
-        try:
-            concept_dt = datetime.strptime(ts_str, "%Y-%m-%d")
-            return concept_dt >= since_dt
-        except ValueError:
+        ts_val = concept.timestamp
+        if isinstance(ts_val, datetime):
+            return ts_val.date() >= since_date
+        if isinstance(ts_val, date):
+            return ts_val >= since_date
+        # It's a string — try to parse
+        if isinstance(ts_val, str):
             try:
-                concept_dt = datetime.fromisoformat(ts_str)
-                return concept_dt >= since_dt
+                concept_dt = datetime.strptime(ts_val, "%Y-%m-%d")
+                return concept_dt.date() >= since_date
             except ValueError:
-                pass
+                try:
+                    concept_dt = datetime.fromisoformat(ts_val)
+                    return concept_dt.date() >= since_date
+                except ValueError:
+                    pass
 
     # Fall back to file modification time
     if concept.file_path and concept.file_path.exists():
         mtime = concept.file_path.stat().st_mtime
-        file_dt = datetime.fromtimestamp(mtime)
-        return file_dt >= since_dt
+        file_date = datetime.fromtimestamp(mtime).date()
+        return file_date >= since_date
 
     return False
 
