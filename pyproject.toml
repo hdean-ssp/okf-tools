@@ -38,8 +38,5 @@ okf = "okf_tools.cli:okf"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-okf_tools = ["../skills/*.md"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]

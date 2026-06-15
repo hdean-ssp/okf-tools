@@ -7,11 +7,14 @@ Write markdown files with YAML frontmatter → okf-tools makes them queryable vi
 ## Quick Start
 
 ```bash
-# Install
+# Install (requires Python 3.9+)
+git clone https://github.com/hdean-ssp/okf-tools.git
+cd okf-tools
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 
 # Create a bundle
-mkdir my-knowledge && cd my-knowledge
+mkdir ~/my-knowledge && cd ~/my-knowledge
 git init && okf init
 
 # Add a concept
@@ -22,7 +25,7 @@ okf commit --check-duplicates --json '{
   "tags": ["reliability", "networking"]
 }'
 
-# Build search index
+# Build search index (first run downloads ~30MB embedding model)
 okf reindex
 
 # Search
@@ -76,6 +79,11 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```
+
+## Branches
+
+- **`main`** — core tool (this branch). Focused on the essential loop: init → commit → fetch → reindex.
+- **`ssp-full`** — extended version with multi-bundle support, link graph traversal, compliance linting, skills system, and Kiro-specific install script.
 
 ## License
 
