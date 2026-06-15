@@ -21,6 +21,7 @@ class Concept:
     frontmatter: Dict[str, Any]
     body: str
     file_path: Path
+    bundle: Optional[str] = None
 
     @property
     def title(self) -> Optional[str]:

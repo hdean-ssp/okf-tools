@@ -118,13 +118,17 @@ Configuration lives at `~/.config/okf/config.json`:
 ```json
 {
   "bundles": [
-    {"name": "personal", "path": "~/personal/my-okf"},
-    {"name": "team", "path": "/shared/team-okf", "default": true}
+    {"name": "personal", "path": "~/my-okf", "default": true},
+    {"name": "team", "path": "~/team-okf"}
   ]
 }
 ```
 
-The `"default": true` bundle is the write target unless `--bundle` is specified.
+**Your active bundles:**
+- **personal** (default write target) — individual learnings, preferences, workflow
+- **team** — shared codebase knowledge, synced via git
+
+When committing, consider whether the knowledge is personal or team-relevant. Use `-b team` for the latter.
 
 ### Bundle Targeting
 
@@ -191,6 +195,17 @@ okf commit --json '{...}'                # Writes to the default bundle
 3. **After learning:** `okf commit --check-duplicates --json '{"title": "...", "type": "...", "content": "...", "tags": [...]}'`
 4. **After bulk changes:** `okf lint` — verify compliance
 
+## Bundle Routing
+
+When committing new knowledge, route to the correct bundle:
+
+| Knowledge type | Bundle | Command |
+|---------------|--------|---------|
+| Personal preferences, workflow, editor config, learning notes | personal | `okf commit --check-duplicates --json '{...}'` |
+| Codebase patterns, bug fixes, architecture decisions, team conventions | team | `okf -b team commit --check-duplicates --json '{...}'` |
+
+**Rule of thumb:** If it would help a teammate, put it in `team`. If it's only about you, put it in `personal`.
+
 ## Output Formats
 
 - Commands output JSON when piped (default for agents) — parse it directly
@@ -210,14 +225,14 @@ echo "  ✓ Installed steering: $STEERING_DIR/okf-knowledge.md"
 cat > "$HOOKS_DIR/okf-prompt-fetch.json" << 'HOOK'
 {
   "name": "OKF Knowledge Awareness",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Points the agent to the okf-knowledge steering file after each prompt so it knows the knowledge tools are available",
   "when": {
     "type": "promptSubmit"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "You have access to okf-tools for managing project knowledge. Refer to the okf-knowledge.md steering file for full command reference and usage guidance. If this task relates to the codebase or project-specific knowledge, consider running `okf fetch` with a relevant query before proceeding."
+    "prompt": "You have access to okf-tools for managing project knowledge across two bundles: 'personal' (your preferences and workflow) and 'team' (shared codebase knowledge). Refer to the okf-knowledge.md steering file for full command reference and bundle routing guidance. If this task relates to the codebase or project-specific knowledge, run `okf fetch` with a relevant query before proceeding (this searches both bundles by default). When committing new knowledge, decide whether it belongs in personal (default) or team (`okf -b team commit`)."
   }
 }
 HOOK
@@ -229,14 +244,14 @@ echo "  ✓ Installed hook: $HOOKS_DIR/okf-prompt-fetch.json"
 cat > "$HOOKS_DIR/okf-post-task-lint.json" << 'HOOK'
 {
   "name": "OKF Lint After Task",
-  "version": "1.0.0",
-  "description": "Runs okf lint after task completion to verify bundle compliance",
+  "version": "1.1.0",
+  "description": "Runs okf lint on both personal and team bundles after task completion to verify compliance",
   "when": {
     "type": "postTaskExecution"
   },
   "then": {
     "type": "runCommand",
-    "command": "okf lint --warn-only --format json"
+    "command": "okf lint --warn-only --format json && okf -b team lint --warn-only --format json"
   }
 }
 HOOK

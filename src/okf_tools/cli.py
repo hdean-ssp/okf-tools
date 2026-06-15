@@ -296,7 +296,7 @@ def list_cmd(ctx: click.Context, type_filter, tags, since, limit, path_filter) -
             bundle_name=bundle_name,
         )
         data = [
-            {"concept_id": c.concept_id, "title": c.title, "type": c.type}
+            {"concept_id": c.concept_id, "title": c.title, "type": c.type, "bundle": c.bundle}
             for c in concepts
         ]
         _output(ctx, data)
@@ -315,12 +315,20 @@ def show(ctx: click.Context, concept_id: str) -> None:
         config = load_config()
         concept = show_concept(config, concept_id)
 
+        # Determine source bundle name
+        bundle_label = None
+        for bundle in config.bundles:
+            if concept.file_path.is_relative_to(bundle.path):
+                bundle_label = bundle.name
+                break
+
         fmt = ctx.obj["format"]
         if fmt == "json":
             data = {
                 "concept_id": concept.concept_id,
                 "frontmatter": concept.frontmatter,
                 "body": concept.body,
+                "bundle": bundle_label,
             }
             click.echo(json.dumps(data, indent=2, default=str))
         elif fmt == "brief":
@@ -334,6 +342,8 @@ def show(ctx: click.Context, concept_id: str) -> None:
             click.echo(f"type: {concept.type}")
             if concept.tags:
                 click.echo(f"tags: {', '.join(concept.tags)}")
+            if bundle_label:
+                click.echo(f"bundle: {bundle_label}")
             click.echo(f"\n{concept.body}")
     except OkfError as e:
         _handle_error(ctx, str(e))
@@ -367,7 +377,8 @@ def reindex(ctx: click.Context, full: bool, run_lint: bool) -> None:
 
     try:
         config = load_config()
-        result = do_reindex(config, full=full, lint=run_lint)
+        bundle_name = ctx.obj.get("bundle_name")
+        result = do_reindex(config, full=full, lint=run_lint, bundle_name=bundle_name)
         _output(ctx, result)
 
         # Non-zero exit if lint found errors

@@ -331,6 +331,10 @@ def list_concepts(
             continue
         concepts = walk_concepts(bundle.path)
 
+        # Tag each concept with its source bundle
+        for c in concepts:
+            c.bundle = bundle.name
+
         if path_filter:
             filter_path = (bundle.path / path_filter).resolve()
             concepts = [c for c in concepts if c.file_path.is_relative_to(filter_path)]
@@ -394,14 +398,37 @@ def get_links(
         graph.close()
 
 
-def reindex(config: OkfConfig, full: bool = False, lint: bool = False) -> Dict[str, Any]:
-    """Index rebuild. Returns summary dict, optionally with lint results."""
-    index, graph = _open_index_and_graph(config)
+def reindex(
+    config: OkfConfig,
+    full: bool = False,
+    lint: bool = False,
+    bundle_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Index rebuild. Returns summary dict, optionally with lint results.
+
+    If bundle_name is specified, reindexes only that bundle.
+    Otherwise reindexes the default bundle.
+    """
+    if bundle_name:
+        bundle = config.get_bundle(bundle_name)
+        if bundle is None:
+            from .errors import ConfigError
+            raise ConfigError(
+                "bundles",
+                f"Bundle '{bundle_name}' not found. "
+                f"Available: {', '.join(b.name for b in config.bundles)}",
+            )
+        index, graph = _open_index_and_graph_for_bundle(bundle)
+        bundle_path = bundle.path
+    else:
+        index, graph = _open_index_and_graph(config)
+        bundle_path = config.bundle_path
+
     try:
         if full or index.get_sync_timestamp() is None:
-            summary = full_reindex(config.bundle_path, index, graph, config)
+            summary = full_reindex(bundle_path, index, graph, config)
         else:
-            summary = incremental_reindex(config.bundle_path, index, graph, config)
+            summary = incremental_reindex(bundle_path, index, graph, config)
     finally:
         index.close()
         graph.close()
@@ -415,7 +442,7 @@ def reindex(config: OkfConfig, full: bool = False, lint: bool = False) -> Dict[s
     }
 
     if lint:
-        lint_report = _lint_bundle(config.bundle_path, config)
+        lint_report = _lint_bundle(bundle_path, config)
         result["lint"] = {
             "errors": lint_report.errors,
             "warnings": lint_report.warnings,

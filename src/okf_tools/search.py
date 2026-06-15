@@ -187,8 +187,22 @@ class VectorIndex:
                 ))
         return results
 
+    @staticmethod
+    def _escape_fts5_query(query: str) -> str:
+        """Escape a query string for safe use in FTS5 MATCH.
+
+        FTS5 interprets bare hyphens as column filters (e.g. 'multi-bundle'
+        becomes column 'bundle' with term 'multi'). Wrapping each token in
+        double quotes prevents this misinterpretation while preserving
+        tokenization across multiple words.
+        """
+        # Split on whitespace, quote each token individually
+        tokens = query.split()
+        return " ".join(f'"{token}"' for token in tokens)
+
     def search_keyword(self, query: str, top_n: int) -> List[SearchResult]:
         """BM25 full-text keyword search via FTS5."""
+        safe_query = self._escape_fts5_query(query)
         rows = self._conn.execute(
             """
             SELECT f.concept_id, rank, c.title, c.snippet
@@ -198,7 +212,7 @@ class VectorIndex:
             ORDER BY rank
             LIMIT ?
             """,
-            (query, top_n),
+            (safe_query, top_n),
         ).fetchall()
 
         if not rows:
