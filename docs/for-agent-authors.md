@@ -38,14 +38,14 @@ Uses hybrid search by default (keyword + semantic). For exact term lookups use `
 okf commit --check-duplicates --json '{
   "title": "What I Learned",
   "type": "Pattern",
-  "content": "Detailed description... Link to related: [[other-concept]]",
+  "content": "Detailed description... Link to related: [Other Concept](other-concept.md)",
   "tags": ["relevant", "tags"]
 }'
 ```
 
 Always use `--check-duplicates` to avoid redundant entries. This will **block the commit** (exit code 1) if semantically similar content already exists in any bundle (threshold: 0.85 cosine similarity). Use `--force` to override.
 
-Use `[[concept-id]]` wikilinks in content to create graph edges between concepts.
+Use standard markdown links (`[Display Text](concept-id.md)`) in content to create graph edges between concepts.
 
 ### 3. Lint after bulk changes
 
@@ -126,6 +126,23 @@ Errors are written to stderr as JSON when format is json:
 ```
 
 Check exit codes: 0 = success, 1 = error, 2 = usage error.
+
+## Limitations & Known Issues
+
+### Agent Reliability
+
+okf-tools is designed for agent use, but current LLM agents are imperfect consumers:
+
+- **Agents may skip `okf fetch`** — even with a promptSubmit hook nudging them, agents sometimes proceed without checking existing knowledge. The hook improves consistency but doesn't guarantee it.
+- **Low-quality commits** — agents may commit trivially obvious knowledge ("use try/catch for error handling") that pollutes the bundle. The `--check-duplicates` flag catches exact semantic overlap but not low-value content.
+- **Lint ignored** — agents may complete a task without running `okf lint`, leaving broken links or missing index entries. The postTaskExecution hook helps but isn't enforced.
+- **Inconsistent bundle routing** — in multi-bundle setups, agents may commit personal-grade knowledge to the team bundle or vice versa.
+
+### Mitigation
+
+- **Human curation is required.** Periodically review recent commits: `okf list --since <date>`. Delete low-value entries with `okf delete`.
+- **Hooks help but aren't sufficient.** Treat them as nudges, not guarantees. The real safeguard is reviewing what got committed before pushing a shared bundle.
+- **Start with a single bundle.** Multi-bundle adds routing complexity that agents handle inconsistently. Add a second bundle only after the single-bundle workflow proves useful.
 
 ## Multi-Bundle Agentic Workflows
 

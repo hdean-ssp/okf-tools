@@ -673,7 +673,8 @@ def _concept_matches_since(concept: Concept, since: str) -> None:
 def _check_duplicates(config: OkfConfig, content: str, force: bool) -> None:
     """Check for similar existing concepts across all bundles.
 
-    Raises ValidationError if found and not forced.
+    Raises ValidationError if found and not forced. Shows existing concept
+    titles and snippets to help the user decide.
     """
     embedding = embed_text(content, config.embedding_model)
     all_dups: List[str] = []
@@ -685,12 +686,21 @@ def _check_duplicates(config: OkfConfig, content: str, force: bool) -> None:
         try:
             results = index.search(embedding, 5, config.similarity_threshold)
             for r in results:
-                all_dups.append(f"{bundle.name}:{r.concept_id} (score={r.score})")
+                title_part = f" \"{r.title}\"" if r.title else ""
+                snippet_part = f" — {r.snippet[:80]}..." if r.snippet else ""
+                all_dups.append(
+                    f"{bundle.name}:{r.concept_id}{title_part} "
+                    f"(score={r.score}){snippet_part}"
+                )
         finally:
             index.close()
 
     if all_dups and not force:
-        raise ValidationError([f"Similar concepts found: {'; '.join(all_dups)}"])
+        dup_list = "\n  ".join(all_dups)
+        raise ValidationError([
+            f"Similar concepts already exist:\n  {dup_list}\n"
+            f"Use --force to commit anyway."
+        ])
 
 
 def _result_type_matches(config: OkfConfig, result: SearchResult, type_filter: str) -> bool:

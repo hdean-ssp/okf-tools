@@ -70,7 +70,7 @@ okf commit --json '...' --check-duplicates --force
 
 Unrecognized fields in JSON input are silently ignored (a warning is printed to stderr).
 
-**Linking:** Use `[[concept-id]]` or `[[concept-id|Display Text]]` wikilinks in concept content to create graph edges. These are automatically parsed and indexed into the link graph on commit/reindex.
+**Linking:** Use standard markdown links (`[Display Text](concept-id.md)`) in concept content to create graph edges. These are automatically parsed and indexed into the link graph on commit/reindex.
 
 **Multi-bundle:**
 ```bash
@@ -178,7 +178,7 @@ okf fetch "query" --format json        # Per-command format override
 
 ## okf links \<concept-id\>
 
-Show link graph (inbound + outbound). Links are parsed from concept content — both markdown links (`[text](./other.md)`) and wikilinks (`[[concept-id]]` or `[[concept-id|Display Text]]`) are supported.
+Show link graph (inbound + outbound). Links are parsed from concept content — standard markdown links (`[text](./other.md)`) are the supported format.
 
 ```bash
 okf links patterns/retry

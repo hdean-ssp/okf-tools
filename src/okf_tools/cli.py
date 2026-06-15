@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 import click
 
-from . import __version__
+from . import __version__, OKF_SPEC_VERSION
 from .config import load_config
 from .errors import OkfError
 
@@ -96,13 +96,31 @@ def _handle_error(ctx: click.Context, message: str, exit_code: int = 1) -> None:
     default=None,
     help="Target a specific bundle by name (for multi-bundle setups)",
 )
-@click.version_option(version=__version__)
+@click.version_option(
+    version=__version__,
+    prog_name="okf-tools",
+    message="%(prog)s %(version)s (targeting OKF spec v" + OKF_SPEC_VERSION + ")",
+)
 @click.pass_context
 def okf(ctx: click.Context, fmt: Optional[str], bundle_name: Optional[str]) -> None:
     """OKF bundle tools — search, author, and navigate knowledge."""
     ctx.ensure_object(dict)
     ctx.obj["format"] = _detect_format(fmt)
     ctx.obj["bundle_name"] = bundle_name
+
+    # Helpful nudge if -b is used but only one bundle exists
+    if bundle_name:
+        try:
+            config = load_config()
+            if len(config.bundles) <= 1 and config.get_bundle(bundle_name) is None:
+                click.echo(
+                    f"hint: Bundle '{bundle_name}' not found. "
+                    f"Only one bundle configured. "
+                    f"Use `okf init --register --name <name>` to add more.",
+                    err=True,
+                )
+        except Exception:
+            pass  # Config loading errors handled by subcommands
 
 
 # --- Commands ---
@@ -234,6 +252,7 @@ def fetch(
 @click.option("--path", "target_path", help="Target subdirectory")
 @click.option("--check-duplicates", is_flag=True, help="Check for similar concepts")
 @click.option("--force", is_flag=True, help="Force commit even if duplicates found")
+@click.option("--dry-run", is_flag=True, help="Show what would be committed without writing")
 @click.pass_context
 def commit(ctx: click.Context, **kwargs) -> None:
     """Create a new concept in the bundle."""
@@ -243,6 +262,21 @@ def commit(ctx: click.Context, **kwargs) -> None:
         config = load_config()
         input_data = _parse_commit_input(kwargs)
         bundle_name = ctx.obj.get("bundle_name")
+
+        # Dry run: show what would happen without persisting
+        if kwargs.get("dry_run"):
+            bundle = config.get_writable_bundle(bundle_name)
+            _output(ctx, {
+                "dry_run": True,
+                "title": input_data.get("title"),
+                "type": input_data.get("type"),
+                "tags": input_data.get("tags", []),
+                "target_bundle": bundle.name,
+                "target_path": input_data.get("path", "(bundle root)"),
+                "content_length": len(input_data.get("content", "")),
+            })
+            return
+
         concept_id = commit_concept(config, input_data, bundle_name=bundle_name)
         _output(ctx, {"concept_id": concept_id})
     except OkfError as e:

@@ -169,6 +169,11 @@ class LinkGraph:
         avg = round(edge_count / total_concepts, 1) if total_concepts > 0 else 0.0
         return {"edge_count": edge_count, "average_links_per_concept": avg}
 
+    def clear(self) -> None:
+        """Remove all links from the graph. Used by full reindex."""
+        self._conn.execute("DELETE FROM links")
+        self._conn.commit()
+
     def close(self) -> None:
         """Close the database connection."""
         self._conn.close()

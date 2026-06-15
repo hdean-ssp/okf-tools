@@ -12,13 +12,26 @@ The CLI is a thin Click shell. The service layer orchestrates workflows. Domain 
 
 ## Components
 
+okf-tools has two distinct layers. The core layer implements OKF operations; the integration layer adds agent/IDE workflow support.
+
+### Layer Separation
+
+| Layer | Modules | Purpose |
+|-------|---------|---------|
+| **Core (OKF tooling)** | `bundle.py`, `search.py`, `graph.py`, `sync.py`, `validation.py`, `config.py` | Parse, write, search, lint, and index OKF-compliant markdown files |
+| **Integration (agent framework)** | `skills.py`, `cli.py` (hooks/steering support), install script | Multi-bundle routing, skill discovery, steering files, IDE hooks, progressive disclosure |
+
+The core layer has no opinions about agents or IDEs. It works with files, embeddings, and a link graph. The integration layer wraps it with conventions for how agents should use the core.
+
+### Module Detail
+
 | Module | Responsibility |
 |--------|---------------|
 | `cli.py` | Click commands, output formatting, TTY detection |
 | `service.py` | Workflow orchestration (commit, fetch, lint, etc.) |
 | `bundle.py` | Parse/write OKF files, validate frontmatter, manage index.md |
 | `search.py` | Hybrid search: vector index (sqlite-vec) + FTS5 keyword index, embeddings (fastembed) |
-| `graph.py` | Link parsing (markdown links + `[[wikilinks]]`), adjacency storage, BFS traversal |
+| `graph.py` | Link parsing (markdown links), adjacency storage, BFS traversal |
 | `sync.py` | Change detection, incremental/full reindexing |
 | `validation.py` | Bundle-wide compliance checks (lint) |
 | `config.py` | Configuration loading and merging |
@@ -82,6 +95,19 @@ Merge is per-field — partial configs work fine.
 4. **Single SQLite file** — vector index + FTS index + link graph share one database for simplicity.
 5. **Compliance as infrastructure** — lint isn't an afterthought; it's woven into reindex, steering files, and the default skill pack.
 6. **Multi-bundle by design** — supports personal + shared team bundles. Each bundle is independent (own sidecar index), but the tool aggregates search across all and routes writes to the appropriate one.
+
+## Extensions Beyond OKF
+
+okf-tools is OKF v0.1 compatible but extends the spec in several ways. These extensions are additive — a pure OKF reader can still parse the files — but they enable features not covered by the spec.
+
+| Extension | What it adds | OKF spec says |
+|-----------|-------------|---------------|
+| Wikilink parsing (fallback) | `[[concept-id]]` in body text is parsed as a graph edge — not promoted but handled gracefully if agents produce it | Spec only recognises standard markdown links (`[text](url.md)`) |
+| FTS5 keyword index | Body text stored in sidecar for full-text keyword search | Spec says nothing about search |
+| Sidecar database | `.okf/index/okf.db` stores embeddings, FTS, graph edges, sync metadata | Spec defines the `.okf/` directory but not its contents beyond config |
+| Type consistency linting | Warns on near-duplicate types (e.g. "Bug Fix" vs "bug-fix") | Spec requires `type` field but doesn't constrain values |
+
+**Note:** The graph module parses wikilinks as a fallback if they appear in content, but the recommended and spec-compliant way to link concepts is standard markdown links: `[Display Text](concept-id.md)`. Guides and steering files direct agents toward this syntax.
 
 ## Multi-Bundle Architecture
 

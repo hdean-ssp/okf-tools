@@ -55,6 +55,8 @@ okf reindex
 
 This embeds all concepts using a local model (no API keys needed) and stores vectors in `.okf/index/okf.db`.
 
+> **First run:** The embedding model (~30MB, BAAI/bge-small-en-v1.5) is downloaded automatically on the first command that needs it. This is a one-time download — no network access required after that.
+
 ## Search
 
 ```bash
@@ -81,7 +83,9 @@ Checks:
 - Link integrity (no broken internal links)
 - Type consistency (no near-duplicate type values)
 
-## Multi-Bundle Setup
+## Multi-Bundle Setup (Advanced)
+
+> **Start with a single bundle.** The workflow above is all you need. Multi-bundle is optional — add it only when you have a clear use case (e.g. separating personal notes from shared team knowledge).
 
 okf supports multiple named bundles — e.g. a personal bundle and a shared team bundle. This lets agents and developers accumulate knowledge collaboratively.
 
@@ -134,3 +138,26 @@ okf fetch "query"                       # Searches all bundles
 - Run `okf links <concept-id>` to explore relationships
 - Run `okf stats` to see bundle health
 - See [CLI Reference](cli-reference.md) for all commands
+
+## Curation
+
+Bundles accumulate knowledge over time. Periodic review keeps them useful:
+
+```bash
+# See what was committed recently
+okf list --since 2025-06-01
+
+# Check bundle health
+okf stats
+
+# Remove low-value entries
+okf delete <concept-id>
+
+# Validate after cleanup
+okf lint
+```
+
+**Tips:**
+- Review agent-committed entries weekly — delete anything generic that the LLM already knows (e.g. "use exponential backoff")
+- Keep entries that capture *project-specific* decisions, patterns, and bug fixes
+- If a concept is outdated, update it with `okf update <id>` rather than deleting and re-committing

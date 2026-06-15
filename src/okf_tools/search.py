@@ -362,6 +362,45 @@ class VectorIndex:
         )
         self._conn.commit()
 
+    def set_model_info(self, model_name: str, dimensions: int) -> None:
+        """Store the embedding model name and dimensions used for this index."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('embedding_model', ?)",
+            (model_name,),
+        )
+        self._conn.execute(
+            "INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('embedding_dimensions', ?)",
+            (str(dimensions),),
+        )
+        self._conn.commit()
+
+    def get_model_info(self) -> "tuple[str | None, int | None]":
+        """Return (model_name, dimensions) stored in this index, or (None, None)."""
+        model_row = self._conn.execute(
+            "SELECT value FROM sync_meta WHERE key = 'embedding_model'"
+        ).fetchone()
+        dim_row = self._conn.execute(
+            "SELECT value FROM sync_meta WHERE key = 'embedding_dimensions'"
+        ).fetchone()
+        model = model_row[0] if model_row else None
+        dims = int(dim_row[0]) if dim_row else None
+        return model, dims
+
+    def check_model_compatibility(self, expected_model: str) -> "str | None":
+        """Check if the index was built with a different model.
+
+        Returns a warning message if there's a mismatch, None if compatible.
+        """
+        stored_model, _ = self.get_model_info()
+        if stored_model is None:
+            return None  # No metadata yet (pre-existing index)
+        if stored_model != expected_model:
+            return (
+                f"Index was built with model '{stored_model}' but config specifies "
+                f"'{expected_model}'. Run `okf reindex --full` to rebuild."
+            )
+        return None
+
     def concept_count(self) -> int:
         """Number of indexed concepts."""
         row = self._conn.execute("SELECT COUNT(*) FROM concepts").fetchone()
@@ -374,6 +413,13 @@ class VectorIndex:
             return result[0] == "ok"
         except Exception:
             return False
+
+    def clear(self) -> None:
+        """Remove all data from the index (concepts, vectors, FTS). Used by full reindex."""
+        self._conn.execute("DELETE FROM concepts")
+        self._conn.execute("DELETE FROM vec_concepts")
+        self._conn.execute("DELETE FROM fts_concepts")
+        self._conn.commit()
 
     def close(self) -> None:
         """Close the database connection."""

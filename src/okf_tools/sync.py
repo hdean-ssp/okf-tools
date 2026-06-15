@@ -73,6 +73,12 @@ def incremental_reindex(
     bundle_root: Path, index: VectorIndex, graph: LinkGraph, config: OkfConfig
 ) -> SyncSummary:
     """Process only changed files."""
+    # Check model compatibility
+    warning = index.check_model_compatibility(config.embedding_model)
+    if warning:
+        import sys
+        print(f"warning: {warning}", file=sys.stderr)
+
     changes = detect_changes(bundle_root, index)
     summary = SyncSummary()
 
@@ -140,11 +146,8 @@ def full_reindex(
     summary = SyncSummary()
 
     # Clear existing data
-    index._conn.execute("DELETE FROM concepts")
-    index._conn.execute("DELETE FROM vec_concepts")
-    index._conn.commit()
-    graph._conn.execute("DELETE FROM links")
-    graph._conn.commit()
+    index.clear()
+    graph.clear()
 
     # Walk and process all concepts
     concepts = walk_concepts(bundle_root)
@@ -173,6 +176,7 @@ def full_reindex(
 
     summary.added = len(concepts) - len(summary.skipped)
     index.set_sync_timestamp(time.time())
+    index.set_model_info(config.embedding_model, 384)
     summary.total_indexed = index.concept_count()
 
     return summary

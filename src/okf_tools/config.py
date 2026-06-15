@@ -20,6 +20,9 @@ DEFAULTS: Dict[str, Any] = {
     "index_path": ".okf/index",
     "embedding_model": "BAAI/bge-small-en-v1.5",
     "default_top_n": 5,
+    # 0.85 cosine threshold catches near-duplicates without blocking
+    # legitimately distinct concepts. A value of 1.0 (exact match only)
+    # would effectively disable duplicate detection.
     "similarity_threshold": 0.85,
     "auto_git_add": True,
     "skills_paths": [".kiro/steering/", "~/.config/okf/skills/"],

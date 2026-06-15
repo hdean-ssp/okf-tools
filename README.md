@@ -4,6 +4,8 @@ A companion CLI and library for working with [OKF](https://github.com/GoogleClou
 
 **What it does:** Makes OKF knowledge bundles queryable, navigable, and agent-friendly via semantic search, link graph traversal, compliance linting, and progressive disclosure.
 
+> **OKF-compatible with extensions:** Bundles produced by okf-tools are valid OKF v0.1. The tool adds features on top (hybrid search, FTS indexing, link graph) that don't break spec compliance. See [Architecture > Extensions Beyond OKF](docs/architecture.md#extensions-beyond-okf) for details.
+
 ## Quick Start
 
 ```bash
@@ -87,7 +89,7 @@ All commands support `--format json|text|brief`. Output is JSON when piped (agen
 - **Hybrid search** — combines BM25 keyword matching with vector semantic similarity (no external services). Searches across all configured bundles
 - **Local embeddings** — fastembed + BAAI/bge-small-en-v1.5, no API keys needed
 - **Incremental indexing** — only re-embeds changed files
-- **Link graph** — parse `[[wikilinks]]` and markdown links between concepts for backlink/neighborhood queries
+- **Link graph** — parse markdown links between concepts for backlink/neighborhood queries
 - **Compliance-first** — `okf lint` validates structure, links, types, and frontmatter
 - **Extensible** — drop-in skill packs for domain-specific agent guidance
 
@@ -119,6 +121,7 @@ See [Getting Started](docs/getting-started.md#multi-bundle-setup) for full setup
 - [Architecture](docs/architecture.md)
 - [Writing Skill Packs](docs/skills.md)
 - [For Agent Authors](docs/for-agent-authors.md)
+- [Known Risks](docs/risks.md)
 
 ## Development
 
