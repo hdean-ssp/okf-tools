@@ -2,6 +2,8 @@
 
 Local semantic search over [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) knowledge bundles. No API keys, no cloud services.
 
+**Why it exists:** Engineers waste hours rediscovering knowledge that already exists — scattered across wikis, Slack, git history, and colleagues' heads. OKF defines a vendor-neutral format (published by Google Cloud Platform) for persisting that knowledge as markdown; okf-tools makes it queryable and useful in practice. OKF defines the format; okf-tools provides the tooling layer.
+
 Write markdown files with YAML frontmatter → okf-tools makes them queryable via hybrid search (BM25 keyword + vector cosine similarity).
 
 ## Quick Start
@@ -26,11 +28,23 @@ okf commit --check-duplicates --json '{
 }'
 
 # Build search index (first run downloads ~30MB embedding model)
+# Note: first run takes ~30 seconds to download the model. Subsequent runs are instant.
 okf reindex
 
 # Search
 okf fetch "how to handle network failures"
 ```
+
+## What Next?
+
+After completing the Quick Start above:
+
+- `okf fetch "your question"` — search your bundle with natural language
+- `okf list` — browse all concepts
+- `okf show <concept-id>` — view full concept content
+- `okf stats` — check bundle health
+- See [Use Cases & Examples](docs/use-cases.md) for real-world workflows
+- See [Getting Started](docs/getting-started.md) for the full guide
 
 ## Commands
 
@@ -68,6 +82,10 @@ See `agent/hooks/README.md` for setup instructions per IDE.
 
 - [Getting Started](docs/getting-started.md)
 - [CLI Reference](docs/cli-reference.md)
+- [Use Cases & Examples](docs/use-cases.md)
+- [Metrics & Impact Measurement](docs/metrics.md)
+- [Validation Checklist](docs/validation-checklist.md)
+- [Proof Point Summary](PROOF_POINT.md)
 
 ## Development
 

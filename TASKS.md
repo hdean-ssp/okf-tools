@@ -1,9 +1,11 @@
 # okf-tools Improvement Task List
 
-Based on external critique. Two-branch strategy:
+Two-branch strategy with a shared goal: make okf-tools demonstrably useful as an OKF companion toolkit and a measurable AI proof point.
 
-- **`main`** — Full-featured version, polished. All current functionality stays, but with fixes for code quality, documentation honesty, CI, and the issues raised in the critique.
-- **`core-only`** — Stripped-down branch proving the essential loop: `init → commit → fetch → reindex`. No multi-bundle, no skills, no hooks, no lint. Validates the core use case independently.
+- **`main`** — Core tool (this branch). Focused on the essential loop: init → commit → fetch → reindex. Proves "local semantic search over markdown is useful" with minimal complexity.
+- **`ssp-full`** — Extended version with multi-bundle support, link graph traversal, compliance linting, skills system, and Kiro-specific install script. Demonstrates the full agent-integrated workflow.
+
+Both branches share the "Proof-Point & Usability" tasks (section below) — each implements them in its own context.
 
 ---
 
@@ -138,11 +140,77 @@ Branch off main, then strip down. Proves the thesis: "local semantic search over
 
 ---
 
+## Proof-Point & Usability — Both Branches
+
+Tasks below apply to both `main` and `ssp-full`. Each branch addresses them in its own context (core vs full-featured).
+
+### Use Cases & Examples
+
+- [ ] **20. Add sample bundle with realistic data**
+  - Create `examples/sample-bundle/` with 5-8 concepts spanning Architecture, Pattern, Bug Fix, and Decision types
+  - Include internal markdown links between concepts
+  - Provide a README in the examples dir showing the expected fetch/show output
+  - Files: `examples/sample-bundle/`, `examples/README.md`
+
+- [ ] **21. Add `okf export` command for structured markdown output**
+  - Export a concept (or set of concepts) as standalone markdown suitable for sharing outside the tool
+  - Support: single concept by ID, or batch by type/tag filter
+  - Output includes frontmatter, body, and resolved links
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+- [ ] **22. Add `--explain` flag to `okf fetch` results**
+  - When set, each result includes a short note on why it matched (keyword hit, semantic similarity, or both)
+  - Helps developers trust and understand search results
+  - Files: `src/okf_tools/search.py`, `src/okf_tools/cli.py`
+
+### Metrics & Measurement
+
+- [ ] **23. Add `okf metrics log` command**
+  - Appends a structured observation to `metrics/observations.yaml` (or a configured path)
+  - Accepts `--metric`, `--value`, `--notes` and/or `--json` input
+  - Creates the metrics directory if it doesn't exist
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+- [ ] **24. Add `okf metrics summary` command**
+  - Reads `metrics/observations.yaml` and prints a grouped summary table
+  - Groups by metric type, shows count, average, and min/max
+  - Output in text or JSON
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+- [ ] **25. Track fetch usage in sidecar (access_count, last_accessed)**
+  - When `okf fetch` returns results, increment `access_count` and update `last_accessed` for each returned concept
+  - Useful for knowledge reuse metrics and identifying stale concepts
+  - Stored in the sidecar database (derived, rebuildable)
+  - Files: `src/okf_tools/search.py`, `src/okf_tools/service.py`
+
+### Reusable Artefact Generation
+
+- [ ] **26. Add `okf summary` command for subsystem overviews**
+  - Given a path filter or tag, generate a markdown summary combining related concepts
+  - Output: title, purpose (from Architecture concepts), key patterns, known issues (from Bug Fix concepts)
+  - Useful for producing onboarding docs or architecture reviews from the bundle
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+### Usability
+
+- [ ] **27. Add `okf quickstart` interactive command**
+  - A guided walkthrough: init → commit a sample concept → reindex → fetch
+  - Prints explanations at each step, suitable for first-time users
+  - Can be run non-interactively with `--yes` for scripting/demos
+  - Files: `src/okf_tools/cli.py`
+
+- [ ] **28. Improve error messages for common failures**
+  - No bundle found → suggest `okf init`
+  - No index exists → suggest `okf reindex`
+  - Empty fetch results → suggest broader query or `okf list` to see what exists
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`, `src/okf_tools/errors.py`
+
+---
+
 ## Parking Lot (future, either branch)
 
 - [ ] `okf doctor` — environment health check (Python, deps, model, PATH)
 - [ ] `okf prune` — surface stale/unused concepts for cleanup
 - [ ] Embedding model hot-swap with automatic reindex
 - [ ] WASM sqlite-vec for broader platform support
-- [ ] Track `access_count` / `last_accessed` for quality signals
 - [ ] Evaluate OKF spec adoption; fork format definition if abandoned
