@@ -4,7 +4,9 @@
 
 A companion CLI and library for working with [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundles — filling the gaps that the spec intentionally leaves open.
 
-**What it does:** Makes OKF knowledge bundles queryable, navigable, and agent-friendly via semantic search, link graph traversal, compliance linting, multi-bundle collaboration, and progressive disclosure.
+**Why it exists:** Engineers waste hours rediscovering knowledge that already exists — scattered across wikis, Slack, git history, and colleagues' heads. OKF defines a vendor-neutral format for persisting that knowledge as markdown; okf-tools makes it queryable, navigable, and useful in practice.
+
+**What it does:** Makes OKF knowledge bundles queryable, navigable, and agent-friendly via semantic search, link graph traversal, compliance linting, multi-bundle collaboration, and progressive disclosure. OKF defines the format; okf-tools provides the tooling layer.
 
 > **OKF-compatible with extensions:** Bundles produced by okf-tools are valid OKF v0.1. The tool adds features on top (hybrid search, FTS indexing, link graph) that don't break spec compliance. See [Architecture > Extensions Beyond OKF](docs/architecture.md#extensions-beyond-okf) for details.
 
@@ -32,6 +34,7 @@ okf commit --check-duplicates --json '{
 }'
 
 # Build the search index (first run downloads ~30MB embedding model)
+# Note: first run takes ~30 seconds to download the model. Subsequent runs are instant.
 okf reindex
 
 # Search it
@@ -48,6 +51,17 @@ The install script:
 4. Installs steering files and hooks to the target workspace (or `~/.kiro` if no path given)
 
 > **Manual install alternative:** If you prefer to manage your own venv: `python3 -m venv .venv && source .venv/bin/activate && pip install -e .`
+
+## What Next?
+
+After completing the Quick Start above:
+
+- `okf fetch "your question"` — search your bundle with natural language
+- `okf list` — browse all concepts
+- `okf show <concept-id>` — view full concept content
+- `okf stats` — check bundle health
+- See [Use Cases & Examples](docs/use-cases.md) for real-world workflows
+- See [Getting Started](docs/getting-started.md) for the full guide
 
 ## Agent Integration (Steering + Hooks)
 
@@ -125,10 +139,14 @@ See [Getting Started](docs/getting-started.md#multi-bundle-setup) for full setup
 
 - [Getting Started](docs/getting-started.md)
 - [CLI Reference](docs/cli-reference.md)
+- [Use Cases & Examples](docs/use-cases.md)
 - [Architecture](docs/architecture.md)
 - [Writing Skill Packs](docs/skills.md)
 - [For Agent Authors](docs/for-agent-authors.md)
+- [Metrics & Impact Measurement](docs/metrics.md)
+- [Validation Checklist](docs/validation-checklist.md)
 - [Known Risks](docs/risks.md)
+- [Proof Point Summary](PROOF_POINT.md)
 
 ## Development
 
@@ -145,6 +163,7 @@ pytest
 
 - **`main`** — minimal core tool (init, commit, fetch, show, reindex). Best starting point for most users.
 - **`ssp-full`** (this branch) — extended version with multi-bundle, link graph, lint, skills, steering, hooks, and the install script. Used internally at SSP.
+- **`core-only`** (planned) — stripped-down branch derived from `main`, proving "local semantic search over markdown is useful" with no agent integration complexity. See TASKS.md for details.
 
 ## License
 

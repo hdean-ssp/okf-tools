@@ -1,9 +1,11 @@
 # okf-tools Improvement Task List
 
-Based on external critique. Two-branch strategy:
+Two-branch strategy with a shared goal: make okf-tools demonstrably useful as an OKF companion toolkit and a measurable AI proof point.
 
-- **`main`** — Full-featured version, polished. All current functionality stays, but with fixes for code quality, documentation honesty, CI, and the issues raised in the critique.
-- **`core-only`** — Stripped-down branch proving the essential loop: `init → commit → fetch → reindex`. No multi-bundle, no skills, no hooks, no lint. Validates the core use case independently.
+- **`main`** — Full-featured version, polished. All current functionality stays, with fixes for code quality, documentation honesty, and the issues raised in earlier critique. This branch also demonstrates the full agent-integrated workflow.
+- **`core-only`** — Stripped-down branch proving the essential loop: `init → commit → fetch → reindex`. No multi-bundle, no skills, no hooks, no lint. Validates the core use case independently. Demonstrates that local semantic search over markdown is useful on its own.
+
+Both branches share the "Proof-Point & Usability" tasks (section below) — each implements them in its own context.
 
 ---
 
@@ -18,26 +20,30 @@ Everything below happens on main. Ship what we have, but fix the rough edges.
   - Update requirements doc to match. Add rationale comment in config.py.
   - Files: `.kiro/specs/okf-tools/requirements.md`, `src/okf_tools/config.py`
 
-- [ ] **2. Document wikilinks as a non-OKF extension**
+- [x] **2. Document wikilinks as a non-OKF extension**
   - `[[concept-id]]` isn't in the OKF spec. Be upfront about it.
   - Add "Extensions beyond OKF" section to architecture.md
   - Note in README that bundles are "OKF-compatible with tooling extensions"
   - Files: `docs/architecture.md`, `README.md`
+  - ✅ Done — "Extensions Beyond OKF" table in architecture.md, callout in README
 
-- [ ] **3. Clarify scope: OKF tooling vs agent framework**
+- [x] **3. Clarify scope: OKF tooling vs agent framework**
   - Table in architecture.md: core layer (init, commit, fetch, reindex, lint) vs integration layer (skills, steering, hooks, multi-bundle routing)
   - File: `docs/architecture.md`
+  - ✅ Done — "Layer Separation" table in architecture.md
 
-- [ ] **4. Document agent reliability limitations**
+- [x] **4. Document agent reliability limitations**
   - Add "Limitations" section to for-agent-authors.md
   - Be honest: agents skip fetch, commit garbage, ignore lint. Hooks help but aren't guaranteed.
   - Add curation guidance: bundles need periodic human review
   - Files: `docs/for-agent-authors.md`, `docs/getting-started.md`
+  - ✅ Done — "Limitations & Known Issues" section in for-agent-authors.md, curation section in getting-started.md
 
-- [ ] **5. Add known risks documentation**
+- [x] **5. Add known risks documentation**
   - OKF spec is v0.1 draft — document our stance and migration strategy
   - Pre-1.0 deps (fastembed, sqlite-vec) — what breaks if they change
   - Add to README or new `docs/risks.md`
+  - ✅ Done — docs/risks.md exists with full coverage
 
 - [ ] **6. Make single-bundle the prominent getting-started path**
   - Show minimal "init and go" workflow first, multi-bundle as an advanced topic
@@ -56,18 +62,21 @@ Everything below happens on main. Ship what we have, but fix the rough edges.
   - On load, check stored model vs config — warn + suggest reindex on mismatch
   - File: `src/okf_tools/search.py`
 
-- [ ] **9. Add `--dry-run` to `okf commit`**
+- [x] **9. Add `--dry-run` to `okf commit`**
   - Shows what would be written (title, type, tags, target bundle) without persisting
   - Useful for agents and humans alike
   - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+  - ✅ Done — implemented in cli.py commit command
 
-- [ ] **10. Improve duplicate detection feedback**
+- [x] **10. Improve duplicate detection feedback**
   - When `--check-duplicates` finds a near-match, show the existing concept title + snippet
   - Files: `src/okf_tools/service.py`, `src/okf_tools/cli.py`
+  - ✅ Done — `_check_duplicates()` in service.py shows title + snippet + score
 
-- [ ] **11. Add spec version to `okf --version` output**
+- [x] **11. Add spec version to `okf --version` output**
   - e.g. "okf-tools 0.1.0 (targeting OKF spec v0.1)"
   - Files: `src/okf_tools/cli.py`, `pyproject.toml`
+  - ✅ Done — version_option in cli.py includes OKF_SPEC_VERSION
 
 ### Install & Onboarding
 
@@ -127,14 +136,91 @@ Branch off main, then strip down. Proves the thesis: "local semantic search over
 - [ ] **18. Simplify docs for core-only**
   - README: what it does, install (`pip install`), quick start (init → commit → fetch), and a section pointing to `agent/` for IDE integration
   - CLI reference: just the 5 commands
-  - No architecture doc, no agent-authors doc, no skills docs
-  - Files: `README.md`, `docs/`
+  - Keep: `docs/use-cases.md` (adapt examples to core-only commands — remove links/lint examples)
+  - Keep: `docs/metrics.md` (unchanged — framework applies to both branches)
+  - Keep: `docs/validation-checklist.md` (adapt to core-only: remove lint/links steps)
+  - Keep: `PROOF_POINT.md` (adapt to reflect core-only scope)
+  - Remove: architecture doc, agent-authors doc, skills docs
+  - Files: `README.md`, `docs/`, `PROOF_POINT.md`
 
 - [ ] **19. Verify core-only tests pass independently**
   - Keep test_bundle.py, test_config.py, test_search.py
   - Remove test_graph.py, test_validation.py, test_multi_bundle.py, test_fixes.py (if lint-related)
   - Run pytest, ensure green
   - Files: `tests/`
+
+---
+
+## Proof-Point & Usability — Both Branches
+
+Tasks below apply to both `main` and `core-only`. Each branch should address them in its own context (full-featured vs minimal).
+
+### Use Cases & Examples
+
+- [ ] **20. Add sample bundle with realistic data**
+  - Create `examples/sample-bundle/` with 5-8 concepts spanning Architecture, Pattern, Bug Fix, and Decision types
+  - Include internal markdown links between concepts to demonstrate the link graph
+  - Provide a README in the examples dir showing the expected fetch/show output
+  - Files: `examples/sample-bundle/`, `examples/README.md`
+
+- [ ] **21. Add `okf export` command for structured markdown output**
+  - Export a concept (or set of concepts) as standalone markdown suitable for sharing outside the tool
+  - Support: single concept by ID, or batch by type/tag filter
+  - Output includes frontmatter, body, and resolved links (as relative paths or full text)
+  - Useful for producing "architecture summary" artefacts from the bundle
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+- [ ] **22. Add `--explain` flag to `okf fetch` results**
+  - When set, each result includes a short note on why it matched (keyword hit, semantic similarity, or both)
+  - Helps developers trust and understand search results
+  - Files: `src/okf_tools/search.py`, `src/okf_tools/cli.py`
+
+### Metrics & Measurement
+
+- [ ] **23. Add `okf metrics log` command**
+  - Appends a structured observation to `metrics/observations.yaml` (or a configured path)
+  - Accepts `--metric`, `--value`, `--notes` and/or `--json` input
+  - Creates the metrics directory if it doesn't exist
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+- [ ] **24. Add `okf metrics summary` command**
+  - Reads `metrics/observations.yaml` and prints a grouped summary table
+  - Groups by metric type, shows count, average, and min/max
+  - Output in text or JSON
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+- [ ] **25. Track fetch usage in sidecar (access_count, last_accessed)**
+  - When `okf fetch` returns results, increment `access_count` and update `last_accessed` for each returned concept
+  - Useful for knowledge reuse metrics and identifying stale concepts
+  - Stored in the sidecar database (derived, rebuildable)
+  - Files: `src/okf_tools/search.py`, `src/okf_tools/service.py`
+
+### Reusable Artefact Generation
+
+- [ ] **26. Add `okf summary` command for subsystem overviews**
+  - Given a path filter or tag, generate a markdown summary combining related concepts
+  - Output: title, purpose (from Architecture concepts), key patterns, known issues (from Bug Fix concepts), and links
+  - Useful for producing onboarding docs or architecture reviews from the bundle
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`
+
+- [ ] **27. Add `okf export --format dot` for dependency visualisation**
+  - Export the link graph (or a filtered subset) as a Graphviz DOT file
+  - Allows teams to visualise concept relationships
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/graph.py`
+
+### Usability
+
+- [ ] **28. Add `okf quickstart` interactive command**
+  - A guided walkthrough: init → commit a sample concept → reindex → fetch
+  - Prints explanations at each step, suitable for first-time users
+  - Can be run non-interactively with `--yes` for scripting/demos
+  - Files: `src/okf_tools/cli.py`
+
+- [ ] **29. Improve error messages for common failures**
+  - No bundle found → suggest `okf init`
+  - No index exists → suggest `okf reindex`
+  - Empty fetch results → suggest broader query or `okf list` to see what exists
+  - Files: `src/okf_tools/cli.py`, `src/okf_tools/service.py`, `src/okf_tools/errors.py`
 
 ---
 
