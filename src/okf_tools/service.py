@@ -687,7 +687,7 @@ def _check_duplicates(config: OkfConfig, content: str, force: bool) -> None:
             results = index.search(embedding, 5, config.similarity_threshold)
             for r in results:
                 title_part = f" \"{r.title}\"" if r.title else ""
-                snippet_part = f" — {r.snippet[:80]}..." if r.snippet else ""
+                snippet_part = f" - {r.snippet[:80]}..." if r.snippet else ""
                 all_dups.append(
                     f"{bundle.name}:{r.concept_id}{title_part} "
                     f"(score={r.score}){snippet_part}"

@@ -39,7 +39,7 @@ def _output(ctx: click.Context, data: Any) -> None:
             else:
                 click.echo(str(item))
     else:
-        # Text format — handle different data shapes
+        # Text format - handle different data shapes
         if isinstance(data, dict):
             _print_dict(data)
         elif isinstance(data, list):
@@ -103,7 +103,7 @@ def _handle_error(ctx: click.Context, message: str, exit_code: int = 1) -> None:
 )
 @click.pass_context
 def okf(ctx: click.Context, fmt: Optional[str], bundle_name: Optional[str]) -> None:
-    """OKF bundle tools — search, author, and navigate knowledge."""
+    """OKF bundle tools - search, author, and navigate knowledge."""
     ctx.ensure_object(dict)
     ctx.obj["format"] = _detect_format(fmt)
     ctx.obj["bundle_name"] = bundle_name
@@ -508,10 +508,10 @@ def lint(
             click.echo(json.dumps(data, indent=2))
         else:
             if not report.diagnostics:
-                click.echo(f"✓ Bundle clean ({report.files_checked} files checked)")
+                click.echo(f"[ok] Bundle clean ({report.files_checked} files checked)")
             else:
                 for d in report.diagnostics:
-                    icon = "✗" if d.severity == "error" else "⚠"
+                    icon = "[ERR]" if d.severity == "error" else "[WARN]"
                     click.echo(f"{icon} {d.file}: [{d.rule}] {d.message}")
                 click.echo(
                     f"\n{report.errors} error(s), {report.warnings} warning(s) "
