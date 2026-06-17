@@ -87,15 +87,36 @@ The server communicates over stdio (JSON-RPC). You don't run it manually for nor
 
 ### Client Configuration
 
-**Kiro via Remote-SSH** (recommended setup — Kiro connects to server, MCP runs locally on server):
+**Team/Shared Deployment** (recommended — see [Team Setup Guide](docs/team-setup.md)):
 
-Create `.kiro/settings/mcp.json` on the server:
+Create `~/.kiro/settings/mcp.json` on the server:
 
 ```json
 {
   "mcpServers": {
     "okf-tools": {
-      "command": "/home/hdean/personal/okf-tools/.venv/bin/okf-mcp",
+      "command": "/home/electra/trunk/m3/castle_sdx/etc/okf-tools/.venv/bin/okf-mcp",
+      "args": [
+        "--bundle-path",
+        "/home/electra/trunk/m3/castle_sdx/etc/team-okf"
+      ],
+      "autoApprove": [
+        "commit_concept", "delete_concept", "fetch_concepts",
+        "get_stats", "init_bundle", "list_concepts",
+        "reindex", "show_concept", "update_concept"
+      ]
+    }
+  }
+}
+```
+
+**Kiro via Remote-SSH** (generic setup — Kiro connects to server, MCP runs locally on server):
+
+```json
+{
+  "mcpServers": {
+    "okf-tools": {
+      "command": "/path/to/okf-tools/.venv/bin/okf-mcp",
       "args": ["--bundle-path", "/path/to/your/bundle"]
     }
   }
@@ -115,7 +136,7 @@ Create `.kiro/settings/mcp.json` on the server:
 }
 ```
 
-See [MCP Setup Guide](docs/mcp-setup.md) for full installation and troubleshooting.
+See [MCP Setup Guide](docs/mcp-setup.md) for individual installation or [Team Setup Guide](docs/team-setup.md) for onboarding to the shared deployment.
 
 ### Available Tools
 
@@ -140,17 +161,17 @@ See [MCP Setup Guide](docs/mcp-setup.md) for full installation and troubleshooti
 
 ## Agent Integration
 
-The `agent/` directory contains IDE-agnostic guidance files for AI agents:
+The MCP server handles agent integration directly — no hooks or CLI wrappers needed.
 
-- `agent/AGENT.md` — full usage guide (when to use, commands, workflow pattern)
-- `agent/hooks/` — hook definitions adaptable to Kiro, Cursor, Windsurf, etc.
+- `agent/AGENT.md` — agent usage guide (when to use, MCP tools reference, workflow pattern)
 
-See `agent/hooks/README.md` for setup instructions per IDE.
+Agents access the knowledge bundle through MCP tools (`fetch_concepts`, `commit_concept`, etc.) rather than shelling out to CLI commands.
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md)
-- [MCP Setup Guide](docs/mcp-setup.md)
+- [Team Setup Guide](docs/team-setup.md) — onboarding for the shared deployment
+- [MCP Setup Guide](docs/mcp-setup.md) — individual installation and troubleshooting
+- [Getting Started](docs/getting-started.md) — CLI quick start
 - [CLI Reference](docs/cli-reference.md)
 - [Use Cases & Examples](docs/use-cases.md)
 - [Metrics & Impact Measurement](docs/metrics.md)
