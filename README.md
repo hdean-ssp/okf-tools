@@ -87,7 +87,22 @@ The server communicates over stdio (JSON-RPC). You don't run it manually for nor
 
 ### Client Configuration
 
-**Kiro / Claude Desktop** — add to your MCP settings:
+**Kiro via Remote-SSH** (recommended setup — Kiro connects to server, MCP runs locally on server):
+
+Create `.kiro/settings/mcp.json` on the server:
+
+```json
+{
+  "mcpServers": {
+    "okf-tools": {
+      "command": "/home/hdean/personal/okf-tools/.venv/bin/okf-mcp",
+      "args": ["--bundle-path", "/path/to/your/bundle"]
+    }
+  }
+}
+```
+
+**Local setup** (Kiro and bundle on same machine):
 
 ```json
 {
@@ -100,7 +115,7 @@ The server communicates over stdio (JSON-RPC). You don't run it manually for nor
 }
 ```
 
-If you omit `--bundle-path`, the server auto-discovers the bundle by walking up from the working directory (looking for `.okf/config.json`).
+See [MCP Setup Guide](docs/mcp-setup.md) for full installation and troubleshooting.
 
 ### Available Tools
 
@@ -135,6 +150,7 @@ See `agent/hooks/README.md` for setup instructions per IDE.
 ## Documentation
 
 - [Getting Started](docs/getting-started.md)
+- [MCP Setup Guide](docs/mcp-setup.md)
 - [CLI Reference](docs/cli-reference.md)
 - [Use Cases & Examples](docs/use-cases.md)
 - [Metrics & Impact Measurement](docs/metrics.md)
