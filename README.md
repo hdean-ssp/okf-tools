@@ -69,6 +69,60 @@ All commands support `--format json|text|brief`. Output is JSON when piped (agen
 - **Local embeddings** — fastembed + BAAI/bge-small-en-v1.5 (384 dimensions), no API keys
 - **Incremental indexing** — only re-embeds changed files (mtime comparison)
 
+## MCP Server
+
+okf-tools includes an MCP (Model Context Protocol) server, letting any MCP-compatible client (Kiro, Claude Desktop, etc.) use your knowledge bundle directly.
+
+### Quick Start — MCP Server
+
+```bash
+# Start the server (from within your bundle directory)
+okf-mcp
+
+# Or point to a specific bundle
+okf-mcp --bundle-path ~/my-knowledge
+```
+
+The server communicates over stdio (JSON-RPC). You don't run it manually for normal use — instead, configure your MCP client to launch it.
+
+### Client Configuration
+
+**Kiro / Claude Desktop** — add to your MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "okf-tools": {
+      "command": "okf-mcp",
+      "args": ["--bundle-path", "/path/to/your/bundle"]
+    }
+  }
+}
+```
+
+If you omit `--bundle-path`, the server auto-discovers the bundle by walking up from the working directory (looking for `.okf/config.json`).
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `init_bundle` | Create a new bundle at a given path |
+| `commit_concept` | Add a new concept (title, type, content, tags) |
+| `update_concept` | Modify fields on an existing concept |
+| `delete_concept` | Remove a concept |
+| `fetch_concepts` | Semantic/hybrid search with natural language |
+| `list_concepts` | Browse concepts with filters (type, tags, date, path) |
+| `show_concept` | Get full content of a concept |
+| `reindex` | Rebuild the vector search index |
+| `get_stats` | Bundle health statistics |
+
+### Notes
+
+- The server starts without a bundle configured — use `init_bundle` to create one, or pass `--bundle-path`
+- All tools except `init_bundle` require a configured bundle
+- Errors are returned as structured MCP tool errors (no stack traces exposed)
+- All logging goes to stderr (stdout is the JSON-RPC channel)
+
 ## Agent Integration
 
 The `agent/` directory contains IDE-agnostic guidance files for AI agents:
@@ -98,9 +152,12 @@ pip install -e ".[dev]"
 pytest
 ```
 
+Dev dependencies include `pytest`, `hypothesis` (property-based testing), and `pytest-asyncio`.
+
 ## Branches
 
-- **`main`** — core tool (this branch). Focused on the essential loop: init → commit → fetch → reindex.
+- **`main`** — core CLI tool. Focused on the essential loop: init → commit → fetch → reindex.
+- **`mcp`** — adds the MCP server (`okf-mcp`) for use with Kiro, Claude Desktop, and other MCP clients.
 - **`ssp-full`** — extended version with multi-bundle support, link graph traversal, compliance linting, skills system, and Kiro-specific install script.
 
 ## License
